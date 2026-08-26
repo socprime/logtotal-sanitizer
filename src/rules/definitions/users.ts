@@ -15,28 +15,28 @@ const ACCOUNT_END = '(?![A-Za-z0-9_$\\\\/-])';
 
 const PATH_ROOT = '(?:\\b(?:HKLM|HKCU|HKU|HKCR|HKEY_[A-Z_]+)|\\b[A-Za-z]:)\\\\';
 const NOT_UNDER_PATH_ROOT = `(?<!${PATH_ROOT}(?:(?! [-/])[^<>'"\\n])*)`;
-const DOMAIN_USER = `(?:(?<!${WIN_DOMAIN_EXCLUDE})(?<=(?:^|[^\\\\.-])\\b[A-Za-z0-9](?:[A-Za-z0-9.-]{0,13}[A-Za-z0-9])?\\\\)${NOT_FILENAME}${NOT_GUID}${USER_SEG_SIMPLE}${ACCOUNT_END}${NOT_UNDER_PATH_ROOT})`;
+const DOMAIN_USER = `(?:(?:(?:^|[^\\\\.-])\\b[A-Za-z0-9](?:[A-Za-z0-9.-]{0,13}[A-Za-z0-9])?\\\\)(?<!${WIN_DOMAIN_EXCLUDE})${NOT_FILENAME}${NOT_GUID}(${USER_SEG_SIMPLE})${ACCOUNT_END}${NOT_UNDER_PATH_ROOT})`;
 
 const SID = '(?:\\bS-1-(?:\\d+-){1,14}\\d+\\b)';
 
 const VALUE_WITH_LETTER = '[\\w.@+-]*[A-Za-z][\\w.@+-]*';
-const LDAP_DN_SINGLE = `(?:(?<=\\b(?:uid|sAMAccountName)=)${VALUE_WITH_LETTER})`;
+const LDAP_DN_SINGLE = `(?:\\b(?:uid|sAMAccountName)=)(${VALUE_WITH_LETTER})`;
 const CN_VALUE = "(?:[A-Za-z0-9.'-]+(?: [A-Za-z0-9.'-]+){0,3})";
-const LDAP_DN_CN = `(?:(?<=\\bcn=)${CN_VALUE})`;
+const LDAP_DN_CN = `(?:\\bcn=)(${CN_VALUE})`;
 
-const ARN_USER = '(?:(?<=:user/)[\\w.@+=,-]+)';
-const ARN_ASSUMED_ROLE_SESSION = '(?:(?<=:assumed-role/[\\w+=,.@-]+/)[\\w.@+=,-]+)';
+const ARN_USER = '(?::user/)([\\w.@+=,-]+)';
+const ARN_ASSUMED_ROLE_SESSION = '(?::assumed-role/[\\w+=,.@-]+/)([\\w.@+=,-]+)';
 
-const K8S_SERVICE_ACCOUNT = '(?:(?<=\\bsystem:serviceaccount:[A-Za-z0-9-]+:)[A-Za-z0-9-]+)';
+const K8S_SERVICE_ACCOUNT = '(?:\\bsystem:serviceaccount:[A-Za-z0-9-]+:)([A-Za-z0-9-]+)';
 
-const SSHD_FOR_USER = '(?:(?<=(?:\\bfor (?:invalid )?user|\\b[Ii]nvalid user)\\s+)[A-Za-z0-9._-]+)';
-const SSHD_RUSER = '(?:(?<=\\bruser=)[A-Za-z0-9._-]+)';
-const SSHD_LOGNAME = '(?:(?<=\\blogname=)[A-Za-z0-9._-]+)';
-const SUDO_USER = '(?:(?<=\\bsudo:\\s+)[A-Za-z0-9._-]+(?=\\s+:))';
+const SSHD_FOR_USER = '(?:(?:\\bfor (?:invalid )?user|\\b[Ii]nvalid user)\\s+)([A-Za-z0-9._-]+)';
+const SSHD_RUSER = '(?:\\bruser=)([A-Za-z0-9._-]+)';
+const SSHD_LOGNAME = '(?:\\blogname=)([A-Za-z0-9._-]+)';
+const SUDO_USER = '(?:\\bsudo:\\s+)([A-Za-z0-9._-]+)(?=\\s+:)';
 
 const GENERIC_KEY =
   '(?:user|username|login|account|owner|actor|principal|requester|createdBy|modifiedBy|assignee|operator)';
-const GENERIC_CTX = `(?:(?<=\\b${GENERIC_KEY}\\s*[=:]\\s*)${VALUE_WITH_LETTER})`;
+const GENERIC_CTX = `(?:\\b${GENERIC_KEY}\\s*[=:]\\s*)(${VALUE_WITH_LETTER})`;
 
 const SLACK_USER_ID_AGGRESSIVE = '(?:\\bU[A-Z0-9]{8,10}\\b)';
 

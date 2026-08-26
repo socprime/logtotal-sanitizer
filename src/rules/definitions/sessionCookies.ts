@@ -21,7 +21,7 @@ export const sessionCookiesRule: SanitizeRule = {
     `(?:(?:csrftoken|csrf_token|XSRF-TOKEN|xsrf-token)=${COOKIE_VALUE})`,
     `(?:remember_token=${COOKIE_VALUE})`,
     `(?:(?:SSESS|SESS)[A-Fa-f0-9]{32}=${COOKIE_VALUE})`,
-    `(?:(?<=[Ss]et-[Cc]ookie:\\s*)[^;=\\s]+=${COOKIE_VALUE})`,
+    `(?:[Ss]et-[Cc]ookie:\\s*)([^;=\\s]+=${COOKIE_VALUE})`,
   ],
   aggressivePatterns: [
     `(?:(?<![\\w-])[\\w-]*session[\\w-]*=${COOKIE_VALUE})`,

@@ -1,6 +1,6 @@
 {
   "name": "@socprime/logtotal-sanitizer",
-  "version": "0.0.1-beta.3",
+  "version": "0.1.0-beta.0",
   "description": "Framework-agnostic log sanitizer that detects and pseudonymizes secrets, PII and infrastructure identifiers in log data, in the browser and in Node.js.",
   "keywords": [
     "sanitizer",
@@ -80,6 +80,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "bench": "node scripts/bench.mjs",
     "verify:isomorphic": "node scripts/verify-isomorphic.mjs",
     "verify:smoke": "node scripts/smoke/esm.mjs && node scripts/smoke/cjs.cjs",
     "verify:pack": "npm run verify:isomorphic && npm run verify:smoke && publint dist --strict --pack npm && attw --pack dist",

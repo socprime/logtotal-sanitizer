@@ -2,9 +2,22 @@ import type { SanitizeRule } from '../types';
 import type { AllowList } from './allowlist';
 import { InvalidRuleError } from './errors';
 import { replacementPrefix, type Pseudonymizer } from './pseudonymize';
+import { countCapturingGroups, deriveGateSource } from './regexSource';
+
+export interface CompiledFragment {
+  regex: RegExp;
+  hasValueGroup: boolean;
+}
+
+export interface CompiledRule {
+  id: string;
+  fragments: CompiledFragment[];
+  gate: RegExp | null;
+  gateChars: string | null;
+}
 
 export interface RuleContext {
-  compiled: RegExp | null;
+  compiled: CompiledRule[];
   rules: SanitizeRule[];
   ruleIds: string[];
   rulesById: Map<string, SanitizeRule>;
@@ -15,24 +28,74 @@ export interface RuleContext {
   json: boolean;
 }
 
-export function compileRules(rules: SanitizeRule[], aggressive: boolean): RegExp | null {
-  const parts = rules
-    .map((rule) => ({
-      id: rule.id,
-      patterns: aggressive ? [...rule.patterns, ...(rule.aggressivePatterns ?? [])] : rule.patterns,
-    }))
-    .filter(({ patterns }) => patterns.length > 0)
-    .map(({ id, patterns }) => `(?<${id}>${patterns.join('|')})`);
+const SKIP_REGEX_GATE = new Set(['ips', 'hosts']);
 
-  if (parts.length === 0) {
+function gateCharsFor(ruleId: string, aggressive: boolean): string | null {
+  if (ruleId === 'phoneNumbers') {
+    return '0123456789';
+  }
+
+  if (ruleId === 'paymentInfo' && !aggressive) {
+    return '0123456789';
+  }
+
+  return null;
+}
+
+function compileOne(rule: SanitizeRule, aggressive: boolean): CompiledRule | null {
+  const patterns = aggressive
+    ? [...rule.patterns, ...(rule.aggressivePatterns ?? [])]
+    : rule.patterns;
+
+  if (patterns.length === 0) {
     return null;
   }
 
-  try {
-    return new RegExp(parts.join('|'), 'gu');
-  } catch (cause) {
-    throw new InvalidRuleError(`Failed to compile the combined rule pattern: ${String(cause)}`);
+  const source = patterns.join('|');
+  const fragments: CompiledFragment[] = [];
+
+  for (const pattern of patterns) {
+    try {
+      fragments.push({
+        regex: new RegExp(pattern, 'gu'),
+        hasValueGroup: countCapturingGroups(pattern) === 1,
+      });
+    } catch (cause) {
+      throw new InvalidRuleError(`Failed to compile rule "${rule.id}": ${String(cause)}`);
+    }
   }
+
+  const gateSource = patterns.map(deriveGateSource).join('|');
+  let gate: RegExp | null = null;
+
+  if (!SKIP_REGEX_GATE.has(rule.id) && gateSource.length > 0 && gateSource !== source) {
+    try {
+      gate = new RegExp(gateSource, 'gu');
+    } catch {
+      gate = null;
+    }
+  }
+
+  return {
+    id: rule.id,
+    fragments,
+    gate,
+    gateChars: gateCharsFor(rule.id, aggressive),
+  };
+}
+
+export function compileRules(rules: SanitizeRule[], aggressive: boolean): CompiledRule[] {
+  const compiled: CompiledRule[] = [];
+
+  for (const rule of rules) {
+    const one = compileOne(rule, aggressive);
+
+    if (one) {
+      compiled.push(one);
+    }
+  }
+
+  return compiled;
 }
 
 export interface RuleContextInput {

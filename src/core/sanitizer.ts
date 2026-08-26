@@ -42,7 +42,7 @@ function processLine(line: string, ctx: RuleContext, collector: ReportCollector)
 /**
  * Creates a reusable sanitizer.
  *
- * Rules are resolved, validated and compiled into a single pattern once, here — so sanitizing many
+ * Rules are resolved, validated and compiled once, here — so sanitizing many
  * inputs with one sanitizer is much cheaper than calling the one-shot helpers repeatedly.
  *
  * @throws {UnknownRuleError} When `rules` names a rule that is not built in.

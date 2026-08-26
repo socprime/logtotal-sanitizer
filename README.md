@@ -116,7 +116,7 @@ const ticket = defineRule({
 const sanitizer = createSanitizer({ rules: ['secrets', ticket] });
 ```
 
-`id` must be a JavaScript identifier (it becomes a named capture group). Use non-capturing groups in `patterns`. Put expensive checks in `validate`, not in the regex.
+`id` must be a JavaScript identifier. At most one capturing group per fragment; it marks the value to replace (the rest of the match is kept). Put expensive checks in `validate`, not in the regex.
 
 ## Streaming and I/O
 

@@ -82,4 +82,36 @@ describe('built-in rules (smoke)', () => {
     const { output } = sanitizeText('version=1.2.3', { ...options, rules: ['secrets'] });
     expect(output).toBe('version=1.2.3');
   });
+
+  it('does not read a GUID group or a hex digest as an international number', () => {
+    const notPhones = [
+      '"SHA256=0043369966E39C40B96C',
+      'dbf410b3-0018-6809-0705-000000004',
+      'dbf410b3-0086-6806-1509-000000003',
+      'CorrelationId=00112233-4455-6677-8899-aabbccddeeff',
+      '0018-6809-0705-000000004',
+      'thumbprint 0012345678abcdef',
+      'md5=00123456789012345678901234567890',
+    ];
+
+    for (const line of notPhones) {
+      const { output, report } = sanitizeText(line, { ...options, rules: ['phoneNumbers'] });
+      expect(output).toBe(line);
+      expect(report.counts.phoneNumbers ?? 0).toBe(0);
+    }
+  });
+
+  it('still redacts international numbers written with 00', () => {
+    const phones = [
+      'call 0044 20 7123 4567 now',
+      'tel 00380671234567 ok',
+      'phone: 0049-30-12345678',
+      'contact 0044 (20) 7123 4567.',
+    ];
+
+    for (const line of phones) {
+      const { output } = sanitizeText(line, { ...options, rules: ['phoneNumbers'] });
+      expect(output).toMatch(/<PHONE:[0-9a-f]{16}>/);
+    }
+  });
 });

@@ -40,11 +40,9 @@ export const healthInfoRule: SanitizeRule = {
     '(?:\\b(?:NDC|[Nn]dc)[:\\s]+\\d{4,5}-\\d{3,4}-\\d{1,2}\\b)',
     '(?:\\b[ABFGMPRX][A-Z9]\\d{7}\\b)',
     '(?:\\b(?:[Nn][Pp][Ii])\\s*[=:]\\s*\\d{10}\\b)',
-    `(?:(?<=\\b${MRN_KEY}\\s*[=:]\\s*)[A-Za-z0-9-]{4,}\\b)`,
+    `(?:\\b${MRN_KEY}\\s*[=:]\\s*)([A-Za-z0-9-]{4,})\\b`,
   ],
-  aggressivePatterns: [
-    '(?:(?<![A-Za-z0-9])[A-TV-Z]\\d{2}(?:\\.\\w{1,4})?(?![A-Za-z0-9:]))',
-  ],
+  aggressivePatterns: ['(?:(?<![A-Za-z0-9])[A-TV-Z]\\d{2}(?:\\.\\w{1,4})?(?![A-Za-z0-9:]))'],
   validate: validateHealth,
   jsonKeys: [
     'diagnosis',

@@ -228,6 +228,7 @@ export function redactJsonLine(
             ruleId: fieldRule.id,
             original: value,
             replacement,
+            index: Math.max(content.indexOf(jsonStringContent(value)), 0),
             ...contextFor(value),
           });
         }

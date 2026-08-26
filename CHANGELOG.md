@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Most positive lookbehind fragments now consume their prefix and capture only the value to redact.
+  JavaScriptCore (Safari) evaluates lookbehind-led alternatives about 15× slower than V8; this
+  rewrite is equivalent on value spans and is faster in both engines. Two fragments keep their
+  lookbehind because consumption would not be equivalent there.
+- Patterns are compiled one regex per fragment, behind a cheap per-rule prefilter, instead of a
+  single combined pattern. Match selection is unchanged: the leftmost value wins, and ties go to
+  the earlier rule and then the earlier fragment.
+- Sanitizing 1 MB of Windows PowerShell logs is about 4.9× faster under JavaScriptCore and about
+  1.6× faster under V8. Output is byte-identical: verified against the previous implementation on
+  318k real log lines and 1.8M generated adversarial lines across every rule, both modes, JSON
+  mode, allowlists and segment reporting.
+
 ## [0.0.1-beta.3] - 2026-08-26
 
 ### Fixed

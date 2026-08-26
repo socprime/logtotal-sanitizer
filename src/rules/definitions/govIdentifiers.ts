@@ -40,7 +40,11 @@ function isValidItin(area: string, group: string, serial: string): boolean {
 
   const groupNum = Number(group);
 
-  return (groupNum >= 70 && groupNum <= 88) || (groupNum >= 90 && groupNum <= 92) || (groupNum >= 94 && groupNum <= 99);
+  return (
+    (groupNum >= 70 && groupNum <= 88) ||
+    (groupNum >= 90 && groupNum <= 92) ||
+    (groupNum >= 94 && groupNum <= 99)
+  );
 }
 
 function isValidNhs(digits: string): boolean {
@@ -72,7 +76,9 @@ function validateGovId(match: string): boolean {
   const dashed = /^(\d{3})-(\d{2})-(\d{4})$/.exec(match);
 
   if (dashed?.[1] && dashed[2] && dashed[3]) {
-    return isValidSsn(dashed[1], dashed[2], dashed[3]) || isValidItin(dashed[1], dashed[2], dashed[3]);
+    return (
+      isValidSsn(dashed[1], dashed[2], dashed[3]) || isValidItin(dashed[1], dashed[2], dashed[3])
+    );
   }
 
   if (/^\d{3}-\d{3}-\d{3}$/.test(match)) {
@@ -93,7 +99,8 @@ function validateGovId(match: string): boolean {
   return true;
 }
 
-const SSN_CTX = '(?:[Ss][Ss][Nn]|[Ee][Ii][Nn]|[Ss][Ii][Nn]|tax[_-]?id|social[_ -]?security(?:[_ -]?number)?)';
+const SSN_CTX =
+  '(?:[Ss][Ss][Nn]|[Ee][Ii][Nn]|[Ss][Ii][Nn]|tax[_-]?id|social[_ -]?security(?:[_ -]?number)?)';
 const ID_CTX = '(?:passport(?:_no|_number)?|driver[_-]?license|national[_-]?id|tax[_-]?id)';
 
 export const govIdentifiersRule: SanitizeRule = {
@@ -110,14 +117,11 @@ export const govIdentifiersRule: SanitizeRule = {
     '(?:\\b(?:NHS|nhs)(?:[_-]?number)?\\s*[=:]\\s*\\d{10}\\b)',
     '(?:\\b(?!BG|GB|NK|KN|TN|NT|ZZ)[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\\d{6}\\s?[A-D]\\b)',
     '(?:(?<![A-Za-z0-9А-ЯІЇЄҐа-яіїєґ])[А-ЯІЇЄҐ]{2}\\d{6}\\b)',
-    `(?:(?<=\\b${SSN_CTX}\\s*[=:]?\\s*)\\d{9}\\b)`,
-    '(?:(?<=(?:ІПН|РНОКПП|tax[_-]?id)\\s*[=:]?\\s*)\\d{10}\\b)',
-    `(?:(?<=\\b${ID_CTX}\\s*[=:]\\s*)[A-Za-z0-9<]{5,32})`,
+    `(?:\\b${SSN_CTX}\\s*[=:]?\\s*)(\\d{9})\\b`,
+    '(?:(?:ІПН|РНОКПП|tax[_-]?id)\\s*[=:]?\\s*)(\\d{10})\\b',
+    `(?:\\b${ID_CTX}\\s*[=:]\\s*)([A-Za-z0-9<]{5,32})`,
   ],
-  aggressivePatterns: [
-    '(?:\\b[A-Z]{1,2}\\d{6,9}\\b)',
-    '(?:\\b\\d{9,11}\\b)',
-  ],
+  aggressivePatterns: ['(?:\\b[A-Z]{1,2}\\d{6,9}\\b)', '(?:\\b\\d{9,11}\\b)'],
   validate: validateGovId,
   jsonKeys: [
     'ssn',

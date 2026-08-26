@@ -18,8 +18,8 @@ export type BuiltinRuleId =
  * A rule identifier. Built-in identifiers are suggested by editors; any other string is accepted
  * so custom rules can use their own namespace, for example `acme:ticketId`.
  *
- * A rule identifier must be a valid ASCII identifier because it is used as a named capture group
- * in the combined pattern. Namespacing with `:` is not allowed — use `_` instead.
+ * A rule identifier must be a valid ASCII identifier. Namespacing with `:` is not allowed — use
+ * `_` instead.
  */
 export type RuleId = BuiltinRuleId | (string & {});
 
@@ -48,8 +48,7 @@ export type KeyEncoding = 'hex' | 'utf8';
  */
 export interface SanitizeRule {
   /**
-   * Unique identifier, also used as the named capture group in the combined pattern.
-   * Must match `/^[A-Za-z_$][A-Za-z0-9_$]*$/`.
+   * Unique identifier. Must match `/^[A-Za-z_$][A-Za-z0-9_$]*$/`.
    */
   id: RuleId;
   /** Short human-readable name, suitable for a checkbox label or a report heading. */
@@ -64,9 +63,9 @@ export interface SanitizeRule {
    */
   token?: string;
   /**
-   * Regular expression source fragments, combined into one alternation. Each fragment is compiled
-   * with the `u` flag and must not contain capture groups other than non-capturing `(?:…)` —
-   * numbered groups shift the combined pattern's group indices.
+   * Regular expression source fragments, combined into one alternation per rule. Each fragment is
+   * compiled with the `u` flag. At most one capturing group is allowed: it marks the value to
+   * replace, so a consumed prefix such as `/home/(user)` is kept. Named groups are reserved.
    */
   patterns: string[];
   /**

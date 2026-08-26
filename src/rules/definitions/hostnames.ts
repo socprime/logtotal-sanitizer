@@ -967,14 +967,14 @@ const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?';
 
 const HOST_EXACT = `(?:(?<![\\w.$-])(?<![^:/\\\\][/\\\\])(?:${LABEL}\\.)+(?:${TLD_EXACT})(?!\\.?\\w))`;
 
-const HOST_COLLISION = `(?:(?<=(?:https?|sftp|ftps?|wss?)://(?:[^/@\\s]+@)?)(?:${LABEL}\\.)+(?:${TLD_COLLISION})(?!\\.?\\w))`;
+const HOST_COLLISION = `(?:(?:https?|sftp|ftps?|wss?)://(?:[^/@\\s]+@)?)((?:${LABEL}\\.)+(?:${TLD_COLLISION}))(?!\\.?\\w)`;
 
-const UNC_COMPUTER = '(?:(?<=\\\\\\\\)[A-Za-z][A-Za-z0-9-]{0,14}(?=\\\\[A-Za-z0-9$]))';
+const UNC_COMPUTER = '(?:\\\\\\\\)([A-Za-z][A-Za-z0-9-]{0,14})(?=\\\\[A-Za-z0-9$])';
 
-const SPN_HOST = '(?:(?<=\\b[A-Za-z][A-Za-z0-9]*/)[A-Za-z0-9][A-Za-z0-9.-]*(?=@[A-Z0-9.-]+\\b))';
+const SPN_HOST = '(?:\\b[A-Za-z][A-Za-z0-9]*/)([A-Za-z0-9][A-Za-z0-9.-]*)(?=@[A-Z0-9.-]+\\b)';
 
 const HOST_CTX_KEY = '(?:host|hostname|computer)';
-const HOST_CTX = `(?:(?<=\\b${HOST_CTX_KEY}\\s*[=:]\\s*)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)`;
+const HOST_CTX = `(?:\\b${HOST_CTX_KEY}\\s*[=:]\\s*)([A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)`;
 
 const NETBIOS_AGGRESSIVE = '(?:\\b(?:WIN|DESKTOP)-[A-Z0-9]{7,10}\\b)';
 
@@ -984,7 +984,7 @@ const SYSLOG_ISO_TS =
   '\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?';
 const SYSLOG_HOST_NAME = `${LABEL}(?:\\.${LABEL})*`;
 const SYSLOG_HOST_LOOKAHEAD = '(?=\\s+[A-Za-z][A-Za-z0-9_.@-]*(?:\\[\\d+\\])?:)';
-const SYSLOG_HOST = `(?:(?<=(?:${SYSLOG_BSD_TS}|${SYSLOG_ISO_TS})\\s+)${SYSLOG_HOST_NAME}${SYSLOG_HOST_LOOKAHEAD})`;
+const SYSLOG_HOST = `(?:(?:${SYSLOG_BSD_TS}|${SYSLOG_ISO_TS})\\s+)(${SYSLOG_HOST_NAME})${SYSLOG_HOST_LOOKAHEAD}`;
 
 const INVENTORY_PREFIX =
   '(?:[Ss][Rr][Vv]|[Ww][Ee][Bb]|[Dd][Bb]|[Aa][Pp][Pp]|[Hh][Oo][Ss][Tt]|[Nn][Oo][Dd][Ee]|[Pp][Oo][Dd])';

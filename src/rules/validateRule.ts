@@ -1,4 +1,5 @@
 import { InvalidRuleError } from '../core/errors';
+import { countCapturingGroups } from '../core/regexSource';
 import type { SanitizeRule } from '../types';
 
 const RULE_ID_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -31,7 +32,7 @@ function assertPatterns(patterns: unknown, ruleId: string, field: string): strin
 
     if (NAMED_GROUP_PATTERN.test(pattern)) {
       throw new InvalidRuleError(
-        `Rule "${ruleId}": \`${field}[${index}]\` must not declare a named capture group — the rule identifier is used as the group name.`,
+        `Rule "${ruleId}": \`${field}[${index}]\` must not declare a named capture group.`,
       );
     }
 
@@ -40,6 +41,12 @@ function assertPatterns(patterns: unknown, ruleId: string, field: string): strin
     } catch (cause) {
       throw new InvalidRuleError(
         `Rule "${ruleId}": \`${field}[${index}]\` is not a valid Unicode regular expression: ${String(cause)}`,
+      );
+    }
+
+    if (countCapturingGroups(pattern) > 1) {
+      throw new InvalidRuleError(
+        `Rule "${ruleId}": \`${field}[${index}]\` must contain at most one capturing group, which marks the value to replace.`,
       );
     }
 
@@ -56,7 +63,7 @@ export function validateRule(rule: SanitizeRule): SanitizeRule {
 
   if (!RULE_ID_PATTERN.test(id)) {
     throw new InvalidRuleError(
-      `Rule "${id}": \`id\` must be a valid ASCII identifier matching ${RULE_ID_PATTERN.source}, because it is used as a named capture group.`,
+      `Rule "${id}": \`id\` must be a valid ASCII identifier matching ${RULE_ID_PATTERN.source}.`,
     );
   }
 
