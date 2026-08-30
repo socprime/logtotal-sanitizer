@@ -1,4 +1,4 @@
-import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -142,5 +142,32 @@ describe('runCli', () => {
     expect(stderr.text()).toMatch(/1 lines/);
     expect(stderr.text()).not.toMatch(/%/);
     expect(stdout.text()).toMatch(/<IP:/);
+  });
+
+  it('preserves replacement details and previews in an explicit JSON report', async () => {
+    const dir = join(tmpdir(), `logtotal-sanitize-report-${Date.now()}`);
+    await mkdir(dir);
+    const input = join(dir, 'app.log');
+    const reportPath = join(dir, 'report.json');
+    await writeFile(input, 'login from 10.0.0.1\n', 'utf8');
+
+    const stdout = collect();
+    const stderr = collect();
+    const code = await runCli(['-q', '--report', reportPath, input, '-o', join(dir, 'out.log')], {
+      stdin: process.stdin,
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    const report = JSON.parse(await readFile(reportPath, 'utf8')) as {
+      replacements: unknown[];
+      preview: { before: unknown[]; after: unknown[] };
+    };
+
+    expect(code).toBe(EXIT_OK);
+    expect(report.replacements).toHaveLength(1);
+    expect(report.preview.before.length).toBeGreaterThan(0);
+    expect(report.preview.after.length).toBeGreaterThan(0);
+
+    await rm(dir, { recursive: true });
   });
 });
