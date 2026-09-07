@@ -380,6 +380,12 @@ export async function runCli(
     keyEncoding: flags.keyEncoding ?? (suppliedKey ? 'utf8' : 'hex'),
     alwaysRedact: alwaysValues.length > 0 ? { values: alwaysValues } : undefined,
     neverRedact: neverValues.length > 0 ? { values: neverValues } : undefined,
+    // Normal output, progress, and text reports only consume aggregate counts. Preserve the
+    // detailed replacement list and preview for the explicit JSON report surface.
+    report:
+      flags.report && flags.reportFormat === 'json'
+        ? undefined
+        : { previewBytes: 0, replacements: false },
   };
 
   const sanitizer = createSanitizer(options);
