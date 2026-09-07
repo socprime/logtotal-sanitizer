@@ -148,6 +148,11 @@ export interface SanitizeReport {
     before: SanitizeSegment[];
     after: SanitizeSegment[];
   };
+  /**
+   * Present and `true` when {@link ReportOptions.maxReplacementsPerRule} dropped at least one
+   * distinct value. Counts are still complete; only the example list is truncated.
+   */
+  replacementsTruncated?: boolean;
 }
 
 /**
@@ -227,6 +232,12 @@ export interface ReportOptions {
    * @default 0
    */
   contextChars?: number;
+  /**
+   * Cap on distinct original values stored per rule in {@link SanitizeReport.replacements}.
+   * Further matches still increment {@link SanitizeReport.counts} and the `count` of values
+   * already stored. Omit (the default) to keep every distinct value.
+   */
+  maxReplacementsPerRule?: number;
 }
 
 /**
@@ -335,6 +346,11 @@ export interface SanitizeStreamOptions {
    * {@link SanitizationAbortedError} is thrown.
    */
   signal?: AbortSignalLike;
+  /**
+   * Overrides {@link ReportOptions.previewBytes} for this run only. Lets one sanitizer process
+   * several ranges and collect a preview from just the first.
+   */
+  previewBytes?: number;
 }
 
 /** A source of text chunks. Chunk boundaries do not need to align with line boundaries. */

@@ -50,6 +50,7 @@ Reuse `key` across files when the same original value must map to the same token
 | `alwaysRedact`        | —                  | Extra literals and regexes, highest match priority.                                    |
 | `neverRedact`         | —                  | Allowlist. Highest overall priority: matching values are left unchanged.               |
 | `report.contextChars` | `0`                | Characters of surrounding text on each unique replacement.                             |
+| `report.maxReplacementsPerRule` | —        | Cap on distinct originals stored per rule. Counts stay complete.                       |
 
 ### Priority
 
@@ -129,6 +130,8 @@ const output = sink.result();
 ```
 
 Browser helpers: `fromBlob`, `fromWebStream`, `toWebStream`.
+`planLineAlignedRanges(blob, partCount)` returns newline-aligned byte ranges for concurrent
+sanitization; `mergeReports(reports)` folds the resulting reports back together.
 
 Node helpers (subpath `@socprime/logtotal-sanitizer/node`):
 
@@ -150,7 +153,8 @@ The root entry does not import `node:*`.
   totalMatches: 3,
   lineCount: 40,
   replacements: [{ ruleId, original, replacement, count, contextBefore?, contextAfter? }],
-  preview: { before: [{ text, changed }], after: [{ text, changed }] }
+  preview: { before: [{ text, changed }], after: [{ text, changed }] },
+  replacementsTruncated?: true
 }
 ```
 

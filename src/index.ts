@@ -10,7 +10,13 @@ export {
 } from './core/errors';
 export { generateKey } from './core/key';
 export { createSanitizer, sanitizeStream, sanitizeText } from './core/sanitizer';
+export { mergeReports, type MergeReportsOptions } from './core/mergeReports';
 export { fromBlob, fromString, fromWebStream } from './io/sources';
+export {
+  planLineAlignedRanges,
+  type ByteRange,
+  type PlanLineRangesOptions,
+} from './io/planLineRanges';
 export { toCallbackSink, toNullSink, toStringSink, type StringSink } from './io/sinks';
 export { defineRule } from './rules/defineRule';
 export { builtinRuleIds, builtinRules, getBuiltinRule } from './rules/registry';

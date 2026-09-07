@@ -188,6 +188,51 @@ describe('sanitizeText', () => {
     });
     expect(withCtx.report.replacements[0]?.contextBefore).toBe('pre ');
   });
+
+  it('caps distinct replacements per rule without dropping counts', () => {
+    const lines = Array.from({ length: 5 }, (_, i) => `10.0.0.${i + 1}`).join('\n');
+    const { report } = sanitizeText(lines, {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['ips'],
+      report: { maxReplacementsPerRule: 2 },
+    });
+
+    expect(report.counts.ips).toBe(5);
+    expect(report.totalMatches).toBe(5);
+    expect(report.replacements).toHaveLength(2);
+    expect(report.replacementsTruncated).toBe(true);
+    expect(report.replacements.map((row) => row.original)).toEqual(['10.0.0.1', '10.0.0.2']);
+  });
+
+  it('still increments count for a value already stored after the cap', () => {
+    const { report } = sanitizeText('10.0.0.1\n10.0.0.2\n10.0.0.3\n10.0.0.1', {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['ips'],
+      report: { maxReplacementsPerRule: 2 },
+    });
+
+    expect(report.replacements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ original: '10.0.0.1', count: 2 }),
+        expect.objectContaining({ original: '10.0.0.2', count: 1 }),
+      ]),
+    );
+    expect(report.replacements).toHaveLength(2);
+    expect(report.counts.ips).toBe(4);
+  });
+
+  it('omits replacementsTruncated when every distinct value fits', () => {
+    const { report } = sanitizeText('10.0.0.1', {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['ips'],
+      report: { maxReplacementsPerRule: 10 },
+    });
+
+    expect(report.replacementsTruncated).toBeUndefined();
+  });
 });
 
 describe('sanitizeStream', () => {

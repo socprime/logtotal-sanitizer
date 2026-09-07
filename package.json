@@ -1,6 +1,6 @@
 {
   "name": "@socprime/logtotal-sanitizer",
-  "version": "0.1.0-beta.0",
+  "version": "0.2.0-beta.0",
   "description": "Framework-agnostic log sanitizer that detects and pseudonymizes secrets, PII and infrastructure identifiers in log data, in the browser and in Node.js.",
   "keywords": [
     "sanitizer",

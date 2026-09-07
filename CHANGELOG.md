@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0-beta.0] - 2026-09-07
+
+### Added
+
+- `mergeReports` combines reports from disjoint, ordered ranges of the same input: counts and
+  line totals are summed, distinct replacements are merged by `(ruleId, original)`, and preview
+  segments are concatenated until `previewBytes`.
+- `planLineAlignedRanges` splits a `Blob` / `File` into newline-aligned byte ranges so callers can
+  sanitize parts concurrently and concatenate the outputs.
+- `report.maxReplacementsPerRule` caps distinct original values stored per rule. Counts stay
+  complete; `replacementsTruncated` is set when the cap drops at least one value. Unset by
+  default, so CLI `--report json` still dumps the full list.
+- `sanitizeStream` accepts a per-run `previewBytes` override so one sanitizer can collect a
+  preview from only the first range.
+
 ### Changed
 
 - Most positive lookbehind fragments now consume their prefix and capture only the value to redact.
@@ -20,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1.6× faster under V8. Output is byte-identical: verified against the previous implementation on
   318k real log lines and 1.8M generated adversarial lines across every rule, both modes, JSON
   mode, allowlists and segment reporting.
+- The CLI skips collecting the replacement list and preview unless `--report` is JSON, so a
+  normal run no longer pays for detail it never prints.
 
 ## [0.0.1-beta.3] - 2026-08-26
 

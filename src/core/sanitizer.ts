@@ -39,28 +39,6 @@ function processLine(line: string, ctx: RuleContext, collector: ReportCollector)
   return result.output;
 }
 
-/**
- * Creates a reusable sanitizer.
- *
- * Rules are resolved, validated and compiled once, here — so sanitizing many
- * inputs with one sanitizer is much cheaper than calling the one-shot helpers repeatedly.
- *
- * @throws {UnknownRuleError} When `rules` names a rule that is not built in.
- * @throws {InvalidRuleError} When a custom rule is malformed.
- * @throws {InvalidKeyError} When `key` is malformed, or none could be generated.
- * @throws {InvalidOptionError} When an option value is out of range.
- *
- * @example
- * ```ts
- * const sanitizer = createSanitizer({
- *   rules: ['secrets', 'ips', 'users'],
- *   alwaysRedact: { values: ['acme-internal'] },
- *   neverRedact: { values: ['127.0.0.1'] },
- * });
- *
- * const { output, report } = sanitizer.sanitizeText('login from 10.0.0.7 failed');
- * ```
- */
 export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
   const keyEncoding = options.keyEncoding ?? 'hex';
   const key = options.key ?? generateKey();
@@ -86,6 +64,7 @@ export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
   const collectorOptions = {
     previewBytes: options.report?.previewBytes,
     replacements: options.report?.replacements,
+    maxReplacementsPerRule: options.report?.maxReplacementsPerRule,
   };
 
   const rules: readonly RuleInfo[] = selected.map((rule) => ({
@@ -116,7 +95,12 @@ export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
     sink: TextSink,
     streamOptions: SanitizeStreamOptions = {},
   ): Promise<SanitizeReport> {
-    const collector = createReportCollector(collectorOptions);
+    const collector = createReportCollector({
+      ...collectorOptions,
+      ...(streamOptions.previewBytes !== undefined
+        ? { previewBytes: streamOptions.previewBytes }
+        : {}),
+    });
     const splitter = createLineSplitter(options.lines);
     const { signal, onProgress } = streamOptions;
     let charsRead = 0;
@@ -179,17 +163,16 @@ export function sanitizeText(text: string, options?: SanitizerOptions): Sanitize
   return createSanitizer(options).sanitizeText(text);
 }
 
-/**
- * Streams text through a one-off sanitizer.
- *
- * See {@link sanitizeText} for the trade-off of creating a sanitizer per call.
- */
 export function sanitizeStream(
   source: TextSource,
   sink: TextSink,
   options?: SanitizerOptions & SanitizeStreamOptions,
 ): Promise<SanitizeReport> {
-  const { onProgress, signal, ...sanitizerOptions } = options ?? {};
+  const { onProgress, signal, previewBytes, ...sanitizerOptions } = options ?? {};
 
-  return createSanitizer(sanitizerOptions).sanitizeStream(source, sink, { onProgress, signal });
+  return createSanitizer(sanitizerOptions).sanitizeStream(source, sink, {
+    onProgress,
+    signal,
+    previewBytes,
+  });
 }
