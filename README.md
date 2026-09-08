@@ -205,3 +205,42 @@ Exit codes: `0` ok, `1` runtime error or `--fail-on-match`, `2` usage error.
 ## Token correlation
 
 Tokens are HMAC-SHA-256 of `ruleId || 0x00 || original`, truncated to 16 hex chars. Same key + same value + same rule ⇒ same token. A different key produces different tokens. Generated keys use encoding `hex`; pasted keys default to `utf8`.
+
+## Integrations
+
+The sanitizer is a library first, so most real deployments wrap it in something else: a pipeline function, a stream processor, a sidecar. This index tracks integrations that exist today and ones we (or partners) intend to build. Entries maintained outside SOC Prime are marked as such and are not endorsed or supported by SOC Prime.
+
+Status values: **Available** — released and usable. **Planned** — committed, in design or development. **Wanted** — no owner yet; open an issue to claim one.
+
+| Integration | Maintainer | Status | Description |
+| --- | --- | --- | --- |
+| [Cribl Stream Pack](https://github.com/M3NIX/cribl-logtotal-sanitizer) | [@M3NIX](https://github.com/M3NIX) (community) | Available | Cribl Stream Pack that sanitizes `_raw` in-pipeline using a Worker Group Secret as the HMAC key. Ships a Function, a passthrough fallback route, and 100 synthetic preview events. Also on [packs.cribl.io](https://packs.cribl.io/packs/cc-stream-logtotal-sanitizer). |
+| Kafka — sanitize on produce | SOC Prime | Planned | Sanitizes events at the ingestion edge, before they are written to the topic, so raw secrets and identifiers never land in Kafka storage or replicas. |
+| Kafka — sanitize on consume | SOC Prime | Planned | Leaves the topic intact and sanitizes on read, for cases where the cluster is trusted but a specific downstream consumer or third party is not. |
+| [Tenzir](https://tenzir.com) | Open — contributors welcome | Planned | Sanitizer operator for TQL pipelines, applied to selected fields. Likely via the Python or shell operator until a native operator exists. |
+| [Onum](https://onum.com) (CrowdStrike) | Open — contributors welcome | Planned | Sanitizer action in an Onum pipeline, ahead of delivery to Falcon Next-Gen SIEM or any other destination. |
+| [Vector](https://vector.dev) (Datadog) | Open — contributors welcome | Wanted | Sanitization stage in a Vector topology, via an `exec` transform or an HTTP round trip to a sanitizer sidecar. |
+| [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) | Open — contributors welcome | Wanted | Log record processor. The Collector is Go, so this is an external-processor or sidecar pattern rather than an in-process extension. |
+| [Logstash](https://www.elastic.co/logstash) | Open — contributors welcome | Wanted | Filter stage. JRuby runtime means calling the Node CLI or a sanitizer service rather than embedding the library. |
+| [Fluent Bit](https://fluentbit.io) | Open — contributors welcome | Wanted | Filter plugin. Needs either a WASM port of the rule engine or a sidecar; the Lua filter cannot host the library directly. |
+| [Redpanda Connect](https://www.redpanda.com/connect) (Benthos) | Open — contributors welcome | Wanted | Processor in a Connect pipeline, using the `subprocess` or `http` processor against the CLI or a sanitizer service. |
+| [Apache NiFi](https://nifi.apache.org) | Open — contributors welcome | Wanted | Custom processor or `ExecuteStreamCommand` wrapping the CLI, for flow-file content sanitization. |
+| [Splunk Edge Processor / Ingest Processor](https://www.splunk.com/en_us/products/ingest-processor.html) | Open — contributors welcome | Wanted | Sanitization before data reaches the indexer. SPL2 pipelines do not currently accept custom code, so feasibility needs evaluation. |
+| [Elastic ingest pipeline](https://www.elastic.co/guide/en/elasticsearch/reference/current/ingest.html) | Open — contributors welcome | Wanted | Index-time sanitization. Painless cannot host the library, so realistically this means sanitizing upstream in Logstash or a sidecar and documenting the pattern. |
+| [Microsoft Sentinel DCR transformation](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-transformations) | Open — contributors welcome | Wanted | Sanitization before ingestion into Log Analytics. DCR transformations are KQL-only, so this needs an upstream agent or Azure Function approach. |
+| [DataBahn](https://databahn.ai) | Open — contributors welcome | Wanted | Sanitizer stage in a DataBahn pipeline, ahead of any downstream destination. |
+| [Observo AI](https://observo.ai) | Open — contributors welcome | Wanted | Sanitizer stage in an Observo pipeline, complementing its own reduction and routing. |
+| [Axoflow / AxoSyslog](https://axoflow.com) | Open — contributors welcome | Wanted | Sanitization in an AxoSyslog / Axoflow pipeline before forwarding to a SIEM or object storage. |
+| [Abstract Security](https://www.abstract.security) | Open — contributors welcome | Wanted | Sanitizer stage in an Abstract streaming pipeline ahead of routing to a lake or SIEM. |
+| [VirtualMetric DataStream](https://virtualmetric.com) | Open — contributors welcome | Wanted | Sanitization stage in a DataStream pipeline before delivery to downstream destinations. |
+
+### Contributing an integration
+
+Integrations live in their own repositories under their own maintainers; this table is just an index. To be listed, open a PR adding a row with a working link, and make sure the project:
+
+- pins a released `@socprime/logtotal-sanitizer` version and states the minimum supported one
+- reads the HMAC key from the host platform's secret store, never from a config file or
+  a hardcoded default
+- documents that token stability requires the same key, library version, and rule set
+  across every node
+- ships a synthetic sample for testing, with no real log data
