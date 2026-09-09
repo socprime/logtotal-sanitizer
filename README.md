@@ -233,6 +233,7 @@ Status values: **Available** — released and usable. **Planned** — committed,
 | [Axoflow / AxoSyslog](https://axoflow.com) | Open — contributors welcome | Wanted | Sanitization in an AxoSyslog / Axoflow pipeline before forwarding to a SIEM or object storage. |
 | [Abstract Security](https://www.abstract.security) | Open — contributors welcome | Wanted | Sanitizer stage in an Abstract streaming pipeline ahead of routing to a lake or SIEM. |
 | [VirtualMetric DataStream](https://virtualmetric.com) | Open — contributors welcome | Wanted | Sanitization stage in a DataStream pipeline before delivery to downstream destinations. |
+| [Beacon](https://beacon.security/) | Open — contributors welcome | Wanted | Sanitization stage in a Beacon pipeline before delivery to downstream destinations. |
 
 ### Contributing an integration
 
