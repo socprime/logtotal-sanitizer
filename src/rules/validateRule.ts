@@ -97,6 +97,16 @@ export function validateRule(rule: SanitizeRule): SanitizeRule {
     }
   }
 
+  if (rule.jsonKeyContains !== undefined) {
+    if (!Array.isArray(rule.jsonKeyContains)) {
+      throw new InvalidRuleError(`Rule "${id}": \`jsonKeyContains\` must be an array of strings.`);
+    }
+
+    for (const [index, fragment] of rule.jsonKeyContains.entries()) {
+      requireText(fragment, id, `jsonKeyContains[${index}]`);
+    }
+  }
+
   if (rule.validate !== undefined && typeof rule.validate !== 'function') {
     throw new InvalidRuleError(`Rule "${id}": \`validate\` must be a function.`);
   }

@@ -137,4 +137,5 @@ export const usersRule: SanitizeRule = {
     'userId',
     'uid',
   ],
+  jsonKeyContains: ['owner', 'username'],
 };

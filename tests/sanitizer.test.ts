@@ -96,6 +96,84 @@ describe('sanitizeText', () => {
     expect(report.counts.secrets).toBe(2);
   });
 
+  it('redacts Windows Event Computer and owner-like JSON fields by name', () => {
+    const line = JSON.stringify({
+      Event: {
+        System: { Computer: 'MSEDGEWIN10' },
+        EventData: {
+          User: 'MSEDGEWIN10\\IEUser',
+          jobOwner: 'MSEDGEWIN10\\IEUser',
+        },
+      },
+    });
+    const { output, report } = sanitizeText(line, {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['hosts', 'users'],
+    });
+
+    const parsed = JSON.parse(output) as {
+      Event: {
+        System: { Computer: string };
+        EventData: { User: string; jobOwner: string };
+      };
+    };
+
+    expect(parsed.Event.System.Computer).toMatch(/^<HOST:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.User).toMatch(/^<USER:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.jobOwner).toMatch(/^<USER:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.User).toBe(parsed.Event.EventData.jobOwner);
+    expect(report.counts.hosts).toBe(1);
+    expect(report.counts.users).toBe(2);
+  });
+
+  it('redacts Windows Security Event subject fields by name', () => {
+    const line = JSON.stringify({
+      Event: {
+        System: { Computer: 'IEWIN7' },
+        EventData: {
+          SubjectUserSid: 'S-1-5-21-3583694148-1414552638-2922671848-1000',
+          SubjectUserName: 'IEUser',
+          SubjectDomainName: 'IEWIN7',
+          ObjectName:
+            'C:\\Users\\IEUser\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\kushu3sd.default\\key4.db',
+          ProcessName: 'C:\\Users\\Defau1t\\wsus.exe',
+        },
+      },
+    });
+    const { output, report } = sanitizeText(line, {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['hosts', 'users', 'paths'],
+    });
+
+    const parsed = JSON.parse(output) as {
+      Event: {
+        System: { Computer: string };
+        EventData: {
+          SubjectUserSid: string;
+          SubjectUserName: string;
+          SubjectDomainName: string;
+          ObjectName: string;
+          ProcessName: string;
+        };
+      };
+    };
+
+    expect(parsed.Event.System.Computer).toMatch(/^<HOST:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.SubjectUserSid).toMatch(/^<USER:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.SubjectUserName).toMatch(/^<USER:[0-9a-f]{16}>$/);
+    expect(parsed.Event.EventData.SubjectDomainName).toMatch(/^<HOST:[0-9a-f]{16}>$/);
+    expect(parsed.Event.System.Computer).toBe(parsed.Event.EventData.SubjectDomainName);
+    expect(parsed.Event.EventData.ObjectName).toContain('\\Users\\<R:');
+    expect(parsed.Event.EventData.ProcessName).toContain('\\Users\\<R:');
+    expect(output).not.toContain('IEWIN7');
+    expect(output).not.toContain('IEUser');
+    expect(output).not.toContain('Defau1t');
+    expect(report.counts.hosts).toBeGreaterThanOrEqual(2);
+    expect(report.counts.users).toBeGreaterThanOrEqual(2);
+  });
+
   it('highlights jsonKeys values in the before preview even when regex would skip them', () => {
     const line = JSON.stringify({ UserName: 'NT AUTHORITY\\SYSTEM' });
     const { output, report } = sanitizeText(line, {

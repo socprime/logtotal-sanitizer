@@ -1004,6 +1004,7 @@ export const hostnamesRule: SanitizeRule = {
     'host',
     'fqdn',
     'domain',
+    'computer',
     'computerName',
     'serverName',
     'nodeName',
@@ -1011,4 +1012,5 @@ export const hostnamesRule: SanitizeRule = {
     'machineName',
     'targetHost',
   ],
+  jsonKeyContains: ['computer', 'domainname'],
 };

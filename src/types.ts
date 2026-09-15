@@ -85,6 +85,12 @@ export interface SanitizeRule {
    * `x_api_key` and `xApiKey` are the same key.
    */
   jsonKeys?: string[];
+  /**
+   * JSON field names matched when the normalized key contains one of these fragments. Checked only
+   * after an exact {@link SanitizeRule.jsonKeys} miss. The first rule in the active list wins.
+   * Fragments are normalized the same way as {@link SanitizeRule.jsonKeys}.
+   */
+  jsonKeyContains?: string[];
 }
 
 /**

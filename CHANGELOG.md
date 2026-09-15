@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0-beta.1] - 2026-09-15
+
+### Added
+
+- `jsonKeyContains` on `SanitizeRule`: JSON field names are matched when the normalized key
+  contains a fragment, after an exact `jsonKeys` miss. The first active rule wins.
+- `hosts` rule: `computer` in `jsonKeys`, plus `jsonKeyContains` for `computer` and `domainname`
+  (covers Windows Event fields such as `Computer`, `SubjectDomainName`, `TargetDomainName`).
+- `users` rule: `jsonKeyContains` for `owner` and `username` (covers `jobOwner`,
+  `SubjectUserName`, `TargetUserName`, and similar).
+
 ## [0.2.0-beta.0] - 2026-09-07
 
 ### Added

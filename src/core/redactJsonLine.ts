@@ -20,34 +20,61 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[-_]/g, '');
 }
 
-function buildJsonKeyIndex(rules: SanitizeRule[]): Map<string, SanitizeRule> {
-  const index = new Map<string, SanitizeRule>();
+interface JsonKeyMatcher {
+  exact: Map<string, SanitizeRule>;
+  contains: Array<{ fragment: string; rule: SanitizeRule }>;
+}
+
+function buildJsonKeyMatcher(rules: SanitizeRule[]): JsonKeyMatcher {
+  const exact = new Map<string, SanitizeRule>();
+  const contains: Array<{ fragment: string; rule: SanitizeRule }> = [];
 
   for (const rule of rules) {
     for (const key of rule.jsonKeys ?? []) {
       const normalized = normalizeKey(key);
 
-      if (!index.has(normalized)) {
-        index.set(normalized, rule);
+      if (!exact.has(normalized)) {
+        exact.set(normalized, rule);
       }
+    }
+
+    for (const fragment of rule.jsonKeyContains ?? []) {
+      contains.push({ fragment: normalizeKey(fragment), rule });
     }
   }
 
-  return index;
+  return { exact, contains };
 }
 
-const jsonKeyIndexCache = new WeakMap<SanitizeRule[], Map<string, SanitizeRule>>();
+function resolveJsonKeyRule(matcher: JsonKeyMatcher, key: string): SanitizeRule | undefined {
+  const normalized = normalizeKey(key);
+  const exact = matcher.exact.get(normalized);
 
-function jsonKeyIndex(rules: SanitizeRule[]): Map<string, SanitizeRule> {
-  const cached = jsonKeyIndexCache.get(rules);
+  if (exact) {
+    return exact;
+  }
+
+  for (const entry of matcher.contains) {
+    if (normalized.includes(entry.fragment)) {
+      return entry.rule;
+    }
+  }
+
+  return undefined;
+}
+
+const jsonKeyMatcherCache = new WeakMap<SanitizeRule[], JsonKeyMatcher>();
+
+function jsonKeyMatcher(rules: SanitizeRule[]): JsonKeyMatcher {
+  const cached = jsonKeyMatcherCache.get(rules);
 
   if (cached) {
     return cached;
   }
 
-  const index = buildJsonKeyIndex(rules);
-  jsonKeyIndexCache.set(rules, index);
-  return index;
+  const matcher = buildJsonKeyMatcher(rules);
+  jsonKeyMatcherCache.set(rules, matcher);
+  return matcher;
 }
 
 function mergeCounts(target: Record<string, number>, source: Record<string, number>): void {
@@ -179,7 +206,7 @@ export function redactJsonLine(
   const withSegments = options.withSegments ?? false;
   const withMatches = options.withMatches ?? false;
   const collectOriginals = withMatches || withSegments;
-  const keyIndex = jsonKeyIndex(ctx.rules);
+  const keyMatcher = jsonKeyMatcher(ctx.rules);
   const counts: Record<string, number> = {};
   const matches: RedactMatch[] = [];
   const originals: PreviewOriginal[] = [];
@@ -209,7 +236,7 @@ export function redactJsonLine(
 
   const redactValue = (value: unknown, key?: string): unknown => {
     if (typeof value === 'string') {
-      const fieldRule = key === undefined ? undefined : keyIndex.get(normalizeKey(key));
+      const fieldRule = key === undefined ? undefined : resolveJsonKeyRule(keyMatcher, key);
 
       if (fieldRule) {
         if (isAllowed(ctx.allow, fieldRule.id, value)) {
