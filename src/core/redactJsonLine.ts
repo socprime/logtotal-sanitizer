@@ -20,6 +20,10 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[-_]/g, '');
 }
 
+function shouldPreserveJsonValue(value: string): boolean {
+  return value.length === 0 || value === '-';
+}
+
 interface JsonKeyMatcher {
   exact: Map<string, SanitizeRule>;
   contains: Array<{ fragment: string; rule: SanitizeRule }>;
@@ -236,6 +240,10 @@ export function redactJsonLine(
 
   const redactValue = (value: unknown, key?: string): unknown => {
     if (typeof value === 'string') {
+      if (key !== undefined && shouldPreserveJsonValue(value)) {
+        return value;
+      }
+
       const fieldRule = key === undefined ? undefined : resolveJsonKeyRule(keyMatcher, key);
 
       if (fieldRule) {

@@ -5,7 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0-beta.2] - 2026-09-21
+
+### Fixed
+
+- JSON field redaction: Windows placeholder values (`""` and `"-"`) are left unchanged instead
+  of being replaced with a token.
+- `users` rule: `DOMAIN\user` is now also matched when the separator is JSON-escaped
+  (`"User": "CORP\\jdoe"`), so accounts in pretty-printed JSON that never parses line by line are
+  redacted. The account segment gets the same token as the plain-text form.
+- `hosts` rule: quoted JSON host fields (`"Computer": "box1"`, `"SubjectDomainName": "CORP"`) are
+  matched by key name, case- and `-`/`_`-insensitive. The plain-text `computer=` pattern only
+  matched lowercase keys with no quote between the key and the separator.
+- `hosts` rule: the domain half of a quoted `"DOMAIN\account"` value becomes a `HOST` token, so a
+  workstation name correlates with the same name in a `Computer` field. Anchored on both quotes,
+  and guarded by the well-known-domain and filename exclusions the `users` rule already uses, so
+  path segments such as `"System32\cmd.exe"` are left alone.
+- `hosts` rule: UNC computer names are also matched when the separators are JSON-escaped
+  (`"\\\\FILESRV01\\share"`).
 
 ## [0.2.0-beta.1] - 2026-09-15
 

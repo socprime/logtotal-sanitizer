@@ -143,6 +143,54 @@ describe('lookbehind rewrite: value spans', () => {
     expect(spans('CORP\\jdoe', ['users'])[0]).toMatchObject({ original: 'jdoe' });
   });
 
+  it('redacts a domain account whose separator is JSON-escaped', () => {
+    expect(spans('"User": "swachchhanda\\\\xodih"', ['users'])[0]).toMatchObject({
+      ruleId: 'users',
+      original: 'xodih',
+    });
+    expect(spans('{"User":"CORP\\\\jdoe"}', ['users'])[0]).toMatchObject({ original: 'jdoe' });
+    expect(spans('"User": "NT AUTHORITY\\\\SYSTEM"', ['users'])).toEqual([]);
+    expect(spans('"User": "MSEDGEWIN10\\\\IEUser$"', ['users'])).toEqual([]);
+  });
+
+  it('leaves a JSON-escaped Windows path to the paths rule', () => {
+    const line = '"CurrentDirectory": "C:\\\\Users\\\\xodih\\\\AppData\\\\Local\\\\Temp\\\\"';
+    expect(spans(line, ['users'])).toEqual([]);
+    expect(spans(line, ['paths'])[0]).toMatchObject({ ruleId: 'paths', original: 'xodih' });
+    expect(spans('"Unc": "\\\\\\\\FILESRV01\\\\share"', ['users'])).toEqual([]);
+  });
+
+  it('redacts the domain half of a quoted DOMAIN\\account value', () => {
+    expect(spans('"User": "swachchhanda\\\\xodih"', ['hosts'])[0]).toMatchObject({
+      ruleId: 'hosts',
+      original: 'swachchhanda',
+    });
+    expect(spans('"User": "CORP\\jdoe"', ['hosts'])[0]).toMatchObject({ original: 'CORP' });
+  });
+
+  it('keeps quoted paths and well-known domains out of the hosts rule', () => {
+    expect(spans('"Image": "System32\\cmd.exe"', ['hosts'])).toEqual([]);
+    expect(spans('"Dir": "C:\\\\Users\\\\xodih\\\\AppData"', ['hosts'])).toEqual([]);
+    expect(spans('"Group": "BUILTIN\\\\Administrators"', ['hosts'])).toEqual([]);
+    expect(spans('"User": "NT AUTHORITY\\\\SYSTEM"', ['hosts'])).toEqual([]);
+    expect(spans('"Unc": "\\\\\\\\FILESRV01\\\\share"', ['hosts'])[0]).toMatchObject({
+      original: 'FILESRV01',
+    });
+  });
+
+  it('redacts quoted JSON host keys that the plain-text context pattern misses', () => {
+    expect(spans('  "Computer": "swachchhanda",', ['hosts'])[0]).toMatchObject({
+      ruleId: 'hosts',
+      original: 'swachchhanda',
+    });
+    expect(spans('"SubjectDomainName": "IEWIN7"', ['hosts'])[0]).toMatchObject({
+      original: 'IEWIN7',
+    });
+    expect(spans('"computer_name": "box1"', ['hosts'])[0]).toMatchObject({ original: 'box1' });
+    expect(spans('"ParentUser": "-"', ['hosts'])).toEqual([]);
+    expect(spans('"Computer": "-"', ['hosts'])).toEqual([]);
+  });
+
   it('reuses a prefix that an earlier match already covered', () => {
     // "C:" belongs to the first value and to the second match's prefix.
     expect(spans('/home/aC:\\Users\\INFO', ['paths']).map((match) => match.original)).toEqual([

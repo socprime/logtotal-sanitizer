@@ -1,21 +1,34 @@
 import type { SanitizeRule } from '../../types';
+import {
+  ACCOUNT_SEGMENT,
+  BACKSLASH,
+  JSON_BACKSLASH,
+  NETBIOS_DOMAIN,
+  NOT_WINDOWS_FILENAME,
+  WELL_KNOWN_DOMAIN,
+} from '../shared/windowsAccounts';
 
 const EMAIL_LOCAL = '[A-Za-z0-9._%+-]+';
 const EMAIL_DOMAIN = '[A-Za-z0-9.-]+\\.[A-Za-z]{2,}';
 const EMAIL = `(?:\\b${EMAIL_LOCAL}@${EMAIL_DOMAIN})`;
 const EMAIL_IP_LITERAL = `(?:\\b${EMAIL_LOCAL}@\\[[0-9a-fA-F.:]+\\])`;
 
-const WIN_DOMAIN_EXCLUDE = '(?:BUILTIN|NT SERVICE|NT AUTHORITY|Users|Settings|Files)\\\\';
-const USER_SEG_SIMPLE = '[A-Za-z0-9_](?:[A-Za-z0-9_.$-]*[A-Za-z0-9$])';
+const USER_SEG_SIMPLE = ACCOUNT_SEGMENT;
 
-const FILE_EXT = 'exe|dll|sys|bat|cmd|ps1|vbs|msi|tmp|hiv|log|dat|txt|ini|xml|json|lnk|cpl|ocx|drv';
-const NOT_FILENAME = `(?![A-Za-z0-9_$.-]*\\.(?:${FILE_EXT})(?![A-Za-z0-9]))`;
 const NOT_GUID = '(?![0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-)';
 const ACCOUNT_END = '(?![A-Za-z0-9_$\\\\/-])';
 
-const PATH_ROOT = '(?:\\b(?:HKLM|HKCU|HKU|HKCR|HKEY_[A-Z_]+)|\\b[A-Za-z]:)\\\\';
-const NOT_UNDER_PATH_ROOT = `(?<!${PATH_ROOT}(?:(?! [-/])[^<>'"\\n])*)`;
-const DOMAIN_USER = `(?:(?:(?:^|[^\\\\.-])\\b[A-Za-z0-9](?:[A-Za-z0-9.-]{0,13}[A-Za-z0-9])?\\\\)(?<!${WIN_DOMAIN_EXCLUDE})${NOT_FILENAME}${NOT_GUID}(${USER_SEG_SIMPLE})${ACCOUNT_END}${NOT_UNDER_PATH_ROOT})`;
+function domainUserPattern(separator: string): string {
+  const winDomainExclude = `${WELL_KNOWN_DOMAIN}${separator}`;
+  const pathRoot = `(?:\\b(?:HKLM|HKCU|HKU|HKCR|HKEY_[A-Z_]+)|\\b[A-Za-z]:)${separator}`;
+  const notUnderPathRoot = `(?<!${pathRoot}(?:(?! [-/])[^<>'"\\n])*)`;
+  const domain = `(?:^|[^\\\\.-])\\b${NETBIOS_DOMAIN}${separator}`;
+
+  return `(?:(?:${domain})(?<!${winDomainExclude})${NOT_WINDOWS_FILENAME}${NOT_GUID}(${USER_SEG_SIMPLE})${ACCOUNT_END}${notUnderPathRoot})`;
+}
+
+const DOMAIN_USER = domainUserPattern(BACKSLASH);
+const DOMAIN_USER_JSON = domainUserPattern(JSON_BACKSLASH);
 
 const SID = '(?:\\bS-1-(?:\\d+-){1,14}\\d+\\b)';
 
@@ -96,6 +109,7 @@ export const usersRule: SanitizeRule = {
     EMAIL_IP_LITERAL,
     EMAIL,
     DOMAIN_USER,
+    DOMAIN_USER_JSON,
     SID,
     LDAP_DN_SINGLE,
     LDAP_DN_CN,

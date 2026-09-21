@@ -1,4 +1,12 @@
 import type { SanitizeRule } from '../../types';
+import {
+  ACCOUNT_SEGMENT,
+  BACKSLASH,
+  JSON_BACKSLASH,
+  NETBIOS_DOMAIN,
+  NOT_WINDOWS_FILENAME,
+  WELL_KNOWN_DOMAIN,
+} from '../shared/windowsAccounts';
 
 const GTLD = [
   'abbott',
@@ -969,12 +977,47 @@ const HOST_EXACT = `(?:(?<![\\w.$-])(?<![^:/\\\\][/\\\\])(?:${LABEL}\\.)+(?:${TL
 
 const HOST_COLLISION = `(?:(?:https?|sftp|ftps?|wss?)://(?:[^/@\\s]+@)?)((?:${LABEL}\\.)+(?:${TLD_COLLISION}))(?!\\.?\\w)`;
 
-const UNC_COMPUTER = '(?:\\\\\\\\)([A-Za-z][A-Za-z0-9-]{0,14})(?=\\\\[A-Za-z0-9$])';
+function uncComputerPattern(separator: string): string {
+  return `(?:${separator}${separator})([A-Za-z][A-Za-z0-9-]{0,14})(?=${separator}[A-Za-z0-9$])`;
+}
+
+const UNC_COMPUTER = uncComputerPattern(BACKSLASH);
+const UNC_COMPUTER_JSON = uncComputerPattern(JSON_BACKSLASH);
 
 const SPN_HOST = '(?:\\b[A-Za-z][A-Za-z0-9]*/)([A-Za-z0-9][A-Za-z0-9.-]*)(?=@[A-Z0-9.-]+\\b)';
 
 const HOST_CTX_KEY = '(?:host|hostname|computer)';
-const HOST_CTX = `(?:\\b${HOST_CTX_KEY}\\s*[=:]\\s*)([A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)`;
+const HOST_VALUE = '[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?';
+const HOST_CTX = `(?:\\b${HOST_CTX_KEY}\\s*[=:]\\s*)(${HOST_VALUE})`;
+
+function anyCase(word: string): string {
+  let pattern = '';
+
+  for (const char of word) {
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    pattern += lower === upper ? char : `[${lower}${upper}]`;
+  }
+
+  return pattern;
+}
+
+const QUOTED_DOMAIN_ACCOUNT = `(?:")(?!${WELL_KNOWN_DOMAIN}\\\\{1,2})(${NETBIOS_DOMAIN})(?=\\\\{1,2}${NOT_WINDOWS_FILENAME}${ACCOUNT_SEGMENT}")`;
+
+const KEY_WORD = '[A-Za-z_]*';
+const JSON_HOST_KEY = [
+  `${KEY_WORD}${anyCase('computer')}${KEY_WORD}`,
+  `${KEY_WORD}${anyCase('domain')}[_-]?${anyCase('name')}`,
+  `${anyCase('host')}(?:[_-]?${anyCase('name')})?`,
+  anyCase('fqdn'),
+  anyCase('domain'),
+  `${anyCase('server')}[_-]?${anyCase('name')}`,
+  `${anyCase('node')}[_-]?${anyCase('name')}`,
+  `${anyCase('dns')}[_-]?${anyCase('name')}`,
+  `${anyCase('machine')}[_-]?${anyCase('name')}`,
+  `${anyCase('target')}[_-]?${anyCase('host')}`,
+].join('|');
+const HOST_JSON_CTX = `(?:"(?:${JSON_HOST_KEY})"\\s*:\\s*")(${HOST_VALUE})(?=")`;
 
 const NETBIOS_AGGRESSIVE = '(?:\\b(?:WIN|DESKTOP)-[A-Z0-9]{7,10}\\b)';
 
@@ -994,10 +1037,20 @@ export const hostnamesRule: SanitizeRule = {
   id: 'hosts',
   label: 'Hostnames & domains',
   description:
-    'FQDNs, UNC computer names, Kerberos SPN hosts and syslog host fields become the same token everywhere within a session.',
+    'FQDNs, UNC computer names, Kerberos SPN hosts, quoted JSON host fields, the domain half of a quoted DOMAIN\\account value and syslog host fields become the same token everywhere within a session.',
   mode: 'pseudo',
   token: 'HOST',
-  patterns: [HOST_EXACT, HOST_COLLISION, UNC_COMPUTER, SPN_HOST, HOST_CTX, SYSLOG_HOST],
+  patterns: [
+    HOST_EXACT,
+    HOST_COLLISION,
+    UNC_COMPUTER,
+    UNC_COMPUTER_JSON,
+    SPN_HOST,
+    HOST_CTX,
+    HOST_JSON_CTX,
+    QUOTED_DOMAIN_ACCOUNT,
+    SYSLOG_HOST,
+  ],
   aggressivePatterns: [NETBIOS_AGGRESSIVE, INVENTORY_HOST],
   jsonKeys: [
     'hostname',

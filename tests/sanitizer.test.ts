@@ -127,6 +127,52 @@ describe('sanitizeText', () => {
     expect(report.counts.users).toBe(2);
   });
 
+  it('redacts a pretty-printed Windows Event whose fields sit on their own lines', () => {
+    const text = `${JSON.stringify(
+      {
+        Event: {
+          System: { Computer: 'swachchhanda' },
+          EventData: {
+            User: 'swachchhanda\\xodih',
+            CurrentDirectory: 'C:\\Users\\xodih\\AppData\\Local\\Temp\\',
+            ParentUser: '-',
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`;
+
+    const { output, report } = sanitizeText(text, {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['hosts', 'users', 'paths'],
+    });
+
+    expect(output).not.toContain('xodih');
+    expect(output).not.toContain('swachchhanda');
+    expect(output).toMatch(/"Computer": "<HOST:[0-9a-f]{16}>"/);
+    expect(output).toMatch(/"User": "<HOST:[0-9a-f]{16}>\\\\<USER:[0-9a-f]{16}>"/);
+    expect(output).toContain('C:\\\\Users\\\\<R:');
+    expect(output).toContain('"ParentUser": "-"');
+    expect(report.counts.users).toBe(1);
+    expect(report.counts.hosts).toBe(2);
+
+    const hostToken = /"Computer": "(<HOST:[0-9a-f]{16}>)"/.exec(output)?.[1];
+    expect(hostToken).toBeDefined();
+    expect(output).toContain(`"User": "${hostToken!}\\\\<USER:`);
+  });
+
+  it('gives a JSON-escaped account the same token as the plain-text form', () => {
+    const options = { key: KEY, keyEncoding: 'hex' as const, rules: ['users'] as const };
+    const escaped = sanitizeText('"User": "CORP\\\\jdoe"', options).output;
+    const plain = sanitizeText('login CORP\\jdoe ok', options).output;
+    const token = /<USER:[0-9a-f]{16}>/.exec(escaped)?.[0];
+
+    expect(token).toBeDefined();
+    expect(plain).toContain(token!);
+  });
+
   it('redacts Windows Security Event subject fields by name', () => {
     const line = JSON.stringify({
       Event: {
@@ -172,6 +218,29 @@ describe('sanitizeText', () => {
     expect(output).not.toContain('Defau1t');
     expect(report.counts.hosts).toBeGreaterThanOrEqual(2);
     expect(report.counts.users).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not redact Windows placeholder JSON field values', () => {
+    const line = JSON.stringify({
+      Signature: '',
+      IpAddress: '-',
+      SubjectUserName: '-',
+      SubjectDomainName: '-',
+      Workstation: '',
+    });
+    const { output, report } = sanitizeText(line, {
+      key: KEY,
+      keyEncoding: 'hex',
+    });
+
+    expect(JSON.parse(output)).toEqual({
+      Signature: '',
+      IpAddress: '-',
+      SubjectUserName: '-',
+      SubjectDomainName: '-',
+      Workstation: '',
+    });
+    expect(report.totalMatches).toBe(0);
   });
 
   it('highlights jsonKeys values in the before preview even when regex would skip them', () => {
