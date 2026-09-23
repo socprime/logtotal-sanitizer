@@ -336,6 +336,45 @@ describe('sanitizeText', () => {
     expect(withCtx.report.replacements[0]?.contextBefore).toBe('pre ');
   });
 
+  it('uses quoted JSON value context for jsonKeys fields, not substring matches', () => {
+    const line = JSON.stringify({
+      Event: {
+        System: {
+          Computer: 'srv-ad-001.7logs.xyz',
+          Correlation: null,
+        },
+        EventData: {
+          SubjectDomainName: '7logs',
+          TargetDomainName: '7logs',
+        },
+      },
+    });
+    const { report } = sanitizeText(line, {
+      key: KEY,
+      keyEncoding: 'hex',
+      rules: ['hosts'],
+      report: { contextChars: 10 },
+    });
+
+    const domain = report.replacements.find((row) => row.original === '7logs');
+    const fqdn = report.replacements.find((row) => row.original === 'srv-ad-001.7logs.xyz');
+
+    expect(domain).toEqual(
+      expect.objectContaining({
+        contextBefore: 'ainName":"',
+        contextAfter: '","TargetD',
+      }),
+    );
+    expect(fqdn).toEqual(
+      expect.objectContaining({
+        contextBefore: 'omputer":"',
+        contextAfter: '","Correla',
+      }),
+    );
+    expect(domain?.contextBefore).not.toContain('rv-ad-001.');
+    expect(domain?.contextAfter).not.toContain('.xyz');
+  });
+
   it('caps distinct replacements per rule without dropping counts', () => {
     const lines = Array.from({ length: 5 }, (_, i) => `10.0.0.${i + 1}`).join('\n');
     const { report } = sanitizeText(lines, {

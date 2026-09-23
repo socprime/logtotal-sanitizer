@@ -120,6 +120,21 @@ function jsonStringContent(value: string): string {
   return JSON.stringify(value).slice(1, -1);
 }
 
+function locateQuotedJsonValue(
+  text: string,
+  value: string,
+  from = 0,
+): { index: number; length: number } | null {
+  const encoded = jsonStringContent(value);
+  const quotedAt = text.indexOf(`"${encoded}"`, from);
+
+  if (quotedAt === -1) {
+    return null;
+  }
+
+  return { index: quotedAt + 1, length: encoded.length };
+}
+
 function findOriginal(
   text: string,
   original: PreviewOriginal,
@@ -259,12 +274,18 @@ export function redactJsonLine(
         }
 
         if (withMatches) {
+          const located = locateQuotedJsonValue(content, value);
+
           matches.push({
             ruleId: fieldRule.id,
             original: value,
             replacement,
-            index: Math.max(content.indexOf(jsonStringContent(value)), 0),
-            ...contextFor(value),
+            index: located?.index ?? 0,
+            ...(located && ctx.contextChars > 0
+              ? sliceContext(content, located.index, located.length, ctx.contextChars)
+              : ctx.contextChars > 0
+                ? { contextBefore: '', contextAfter: '' }
+                : {}),
           });
         }
 
