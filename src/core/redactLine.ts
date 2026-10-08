@@ -57,6 +57,22 @@ interface FragmentCursor {
 
 /** Moves a cursor to its next match whose value starts at or after `minStart`. */
 function advance(cursor: FragmentCursor, line: string, minStart: number): void {
+  const found = firstForward(cursor, line, minStart);
+
+  if (found === null) {
+    cursor.active = false;
+    return;
+  }
+
+  cursor.start = found.start;
+  cursor.original = found.original;
+}
+
+function firstForward(
+  cursor: { regex: RegExp; hasValueGroup: boolean },
+  line: string,
+  minStart: number,
+): { start: number; original: string } | null {
   const { regex } = cursor;
 
   for (;;) {
@@ -69,8 +85,7 @@ function advance(cursor: FragmentCursor, line: string, minStart: number): void {
     const match = regex.exec(line);
 
     if (match === null) {
-      cursor.active = false;
-      return;
+      return null;
     }
 
     const original = (cursor.hasValueGroup ? match[1] : undefined) ?? match[0];
@@ -85,10 +100,7 @@ function advance(cursor: FragmentCursor, line: string, minStart: number): void {
     }
 
     if (start >= minStart) {
-      cursor.active = true;
-      cursor.start = start;
-      cursor.original = original;
-      return;
+      return { start, original };
     }
   }
 }
@@ -115,21 +127,19 @@ function openCursors(line: string, compiled: CompiledRule[]): FragmentCursor[] {
       const fragment = rule.fragments[fragmentIndex]!;
       fragment.regex.lastIndex = 0;
 
-      const cursor: FragmentCursor = {
-        ruleIndex,
-        fragmentIndex,
-        ruleId: rule.id,
-        regex: fragment.regex,
-        hasValueGroup: fragment.hasValueGroup,
-        active: false,
-        start: 0,
-        original: '',
-      };
+      const found = firstForward(fragment, line, 0);
 
-      advance(cursor, line, 0);
-
-      if (cursor.active) {
-        cursors.push(cursor);
+      if (found !== null) {
+        cursors.push({
+          ruleIndex,
+          fragmentIndex,
+          ruleId: rule.id,
+          regex: fragment.regex,
+          hasValueGroup: fragment.hasValueGroup,
+          active: true,
+          start: found.start,
+          original: found.original,
+        });
       }
     }
   }
@@ -181,6 +191,20 @@ export function redactLine(
   }
 
   const cursors = openCursors(line, compiled);
+
+  if (cursors.length === 0) {
+    return {
+      output: line,
+      counts: {},
+      matches: [],
+      segments: withSegments
+        ? line.length > 0
+          ? { before: [{ text: line, changed: false }], after: [{ text: line, changed: false }] }
+          : { before: [], after: [] }
+        : undefined,
+    };
+  }
+
   const counts: Record<string, number> = {};
   const matches: RedactMatch[] = [];
   const before: SanitizeSegment[] = [];
