@@ -1,8 +1,10 @@
+import { isPrivateIpValue } from '../rules/shared/privateIp';
 import type { NeverRedactOptions } from '../types';
 import { InvalidOptionError } from './errors';
 
 export interface AllowList {
   empty: boolean;
+  keepPrivateIps: boolean;
   values: ReadonlySet<string>;
   pattern: RegExp | null;
   byRule: ReadonlyMap<string, ReadonlySet<string>>;
@@ -30,7 +32,10 @@ function compileAnchored(patterns: readonly (string | RegExp)[]): RegExp | null 
   }
 }
 
-export function createAllowList(options: NeverRedactOptions | undefined): AllowList {
+export function createAllowList(
+  options: NeverRedactOptions | undefined,
+  keepPrivateIps = false,
+): AllowList {
   const values = new Set((options?.values ?? []).filter((value) => value.length > 0));
   const pattern = compileAnchored(options?.patterns ?? []);
   const byRule = new Map<string, Set<string>>();
@@ -48,7 +53,8 @@ export function createAllowList(options: NeverRedactOptions | undefined): AllowL
   }
 
   return {
-    empty: values.size === 0 && pattern === null && byRule.size === 0,
+    empty: values.size === 0 && pattern === null && byRule.size === 0 && !keepPrivateIps,
+    keepPrivateIps,
     values,
     pattern,
     byRule,
@@ -56,6 +62,10 @@ export function createAllowList(options: NeverRedactOptions | undefined): AllowL
 }
 
 export function isAllowed(allow: AllowList, ruleId: string, value: string): boolean {
+  if (allow.keepPrivateIps && ruleId === 'ips' && isPrivateIpValue(value)) {
+    return true;
+  }
+
   if (allow.empty) {
     return false;
   }

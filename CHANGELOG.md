@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2-beta.0] - 2026-11-16
+
+### Added
+
+- CSV path via `csv: true` or `{ delimiter?, header?, hasHeader? }`. The header row is copied
+  unchanged. Columns are classified with the ECS-aware JSON key matcher (a trailing `.keyword`,
+  `.text`, or `.raw` is ignored). `ips` columns are regex-scanned inside the cell; other typed
+  columns replace the whole cell; remaining columns are regex-scanned, and JSON cells use the JSON
+  path. `-` and empty cells are kept. Rows whose field count differs from the header are
+  regex-scanned and counted in `report.csv.misalignedRows`. `report.csv.columns` lists
+  `{ name, action, ruleId }`. User and host values from typed columns are remembered for the rest
+  of the run and replaced in later free-text cells.
+- `keepPrivateIps` and CLI `--keep-private-ips`. RFC 1918 IPv4 addresses (`10/8`, `172.16/12`,
+  `192.168/16`), including IPv4-mapped IPv6, reverse-DNS PTR names, and `ip:port`, stay unchanged
+  on every path.
+- CLI `--format auto|lines|csv` (default `auto`). `auto` selects the CSV path for `.csv` and `.tsv`
+  inputs; a `.tsv` path uses a tab delimiter. Stdin stays in line mode unless `--format csv` is set.
+- `readCsvHeader(blob, { delimiter?, maxBytes? })` returns the header names so parallel workers
+  can run shard 0 with `csv: true` and later shards with `csv: { header }`. The blob is read in
+  64 KiB steps (default cap 4 MiB). A leading UTF-8 BOM is removed.
+- ECS field hints for JSON keys and CSV columns (`user.effective.name`, `dns.question.name`,
+  `agent.name`, `related.*`, `winlog.event_data` Target/Subject fields, `*.nat.ip`, and similar).
+- `hosts` rule: internal suffixes `lab`, `priv`, `private`, `dmz`, and `intra`, case-insensitive.
+
+### Changed
+
+- Well-known Windows principals (`SYSTEM`, `NT AUTHORITY`, `LOCAL SERVICE`, `NETWORK SERVICE`,
+  `S-1-5-18`, and similar) are never key-redacted.
+- Machine accounts keep the trailing `$`. `WKS-0042$` becomes `<USER:…>$`, the same token as
+  `WKS-0042`.
+- ECS field paths such as `host.name`, `user.id`, and `agent.id` are no longer detected as FQDNs.
+- Explicitly non-sensitive ECS fields are not key-redacted: `event.*`, `*.version`, `host.os.name`,
+  `process.name`, and leaves ending in `_count`, `_age`, `_time`, `_bytes`, `_ms`, or `_ns`.
+
+### Fixed
+
+- CSV export header names were sanitized as if they were log text. The header row is now preserved.
+- Domains under the internal `.lab` suffix were missed by the `hosts` rule.
+- `relative_password_age` was key-redacted as a secret because the name contains `password`. Leaves
+  that end in `_age` (and the other non-sensitive suffixes) are left unchanged.
+
 ## [0.2.1-beta.0] - 2026-10-14
 
 ### Fixed

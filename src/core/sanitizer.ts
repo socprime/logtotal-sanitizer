@@ -15,7 +15,14 @@ import { createAllowList } from './allowlist';
 import { createRuleContext, type RuleContext } from './compile';
 import { InvalidOptionError, SanitizationAbortedError } from './errors';
 import { assertKey, generateKey } from './key';
+import {
+  createCsvStreamRunner,
+  resolveCsvOptions,
+  sanitizeCsvText,
+  type ResolvedCsvOptions,
+} from './csvSanitize';
 import { createLineSplitter } from './lineSplitter';
+import { stripBom } from '../csv/parser';
 import { createPseudonymizer } from './pseudonymize';
 import { looksLikeJson, redactJsonLine } from './redactJsonLine';
 import { redactLine } from './redactLine';
@@ -56,7 +63,7 @@ export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
     rules: selected,
     aggressive: options.aggressive ?? false,
     pseudonymize: createPseudonymizer(key, keyEncoding),
-    allow: createAllowList(options.neverRedact),
+    allow: createAllowList(options.neverRedact, options.keepPrivateIps ?? false),
     contextChars,
     json: options.json !== false,
   });
@@ -74,8 +81,18 @@ export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
     mode: rule.mode,
   }));
 
+  const csvOptions: ResolvedCsvOptions | null = options.csv ? resolveCsvOptions(options.csv) : null;
+
   function sanitizeText(text: string): SanitizeTextResult {
     const collector = createReportCollector(collectorOptions);
+
+    if (csvOptions) {
+      return {
+        output: sanitizeCsvText(text, ctx, csvOptions, collector),
+        report: collector.build(),
+      };
+    }
+
     const splitter = createLineSplitter(options.lines);
     let output = '';
 
@@ -101,30 +118,70 @@ export function createSanitizer(options: SanitizerOptions = {}): Sanitizer {
         ? { previewBytes: streamOptions.previewBytes }
         : {}),
     });
-    const splitter = createLineSplitter(options.lines);
     const { signal, onProgress } = streamOptions;
     let charsRead = 0;
 
-    const writeLine = async (line: string): Promise<void> => {
-      if (signal?.aborted === true) {
-        throw new SanitizationAbortedError();
+    if (csvOptions) {
+      const { processor, splitter } = createCsvStreamRunner(ctx, csvOptions, collector);
+      let firstChunk = true;
+
+      const writeRecord = async (record: string): Promise<void> => {
+        if (signal?.aborted === true) {
+          throw new SanitizationAbortedError();
+        }
+
+        await sink.write(processor.processRecord(record));
+      };
+
+      for await (const chunk of toAsyncIterable(source)) {
+        charsRead += chunk.length;
+        let feed = chunk;
+
+        if (firstChunk && chunk.length > 0) {
+          firstChunk = false;
+          const { bom, text } = stripBom(chunk);
+          feed = text;
+
+          if (bom.length > 0) {
+            processor.pushBom(bom);
+            await sink.write(bom);
+          }
+        }
+
+        for (const record of splitter.push(feed)) {
+          await writeRecord(record);
+        }
+
+        onProgress?.({ charsRead, report: collector.build({ includeReplacements: false }) });
       }
 
-      await sink.write(processLine(line, ctx, collector));
-    };
+      for (const record of splitter.flush()) {
+        await writeRecord(record);
+      }
+    } else {
+      const splitter = createLineSplitter(options.lines);
 
-    for await (const chunk of toAsyncIterable(source)) {
-      charsRead += chunk.length;
+      const writeLine = async (line: string): Promise<void> => {
+        if (signal?.aborted === true) {
+          throw new SanitizationAbortedError();
+        }
 
-      for (const line of splitter.push(chunk)) {
+        await sink.write(processLine(line, ctx, collector));
+      };
+
+      for await (const chunk of toAsyncIterable(source)) {
+        charsRead += chunk.length;
+
+        for (const line of splitter.push(chunk)) {
+          await writeLine(line);
+        }
+
+        onProgress?.({ charsRead, report: collector.build({ includeReplacements: false }) });
+      }
+
+      for (const line of splitter.flush()) {
         await writeLine(line);
       }
-
-      onProgress?.({ charsRead, report: collector.build({ includeReplacements: false }) });
-    }
-
-    for (const line of splitter.flush()) {
-      await writeLine(line);
     }
 
     await sink.close?.();

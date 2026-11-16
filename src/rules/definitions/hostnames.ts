@@ -940,6 +940,11 @@ const INTERNAL_SUFFIXES = [
   'test',
   'invalid',
   'localhost',
+  'lab',
+  'priv',
+  'private',
+  'dmz',
+  'intra',
 ];
 const INTERNAL_COMPOUND_SUFFIXES = [
   'svc\\.cluster\\.local',
@@ -970,9 +975,23 @@ const FILE_EXT_COLLISION_TLDS = [
 const COLLISION_TLD_SET = new Set(FILE_EXT_COLLISION_TLDS);
 const GTLD_UNRESTRICTED = GTLD.filter((tld) => !COLLISION_TLD_SET.has(tld));
 
-const TLD_EXACT = [...INTERNAL_COMPOUND_SUFFIXES, ...GTLD_UNRESTRICTED, ...INTERNAL_SUFFIXES].join(
-  '|',
-);
+function anyCase(word: string): string {
+  let pattern = '';
+
+  for (const char of word) {
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    pattern += lower === upper ? char : `[${lower}${upper}]`;
+  }
+
+  return pattern;
+}
+
+const TLD_EXACT = [
+  ...INTERNAL_COMPOUND_SUFFIXES,
+  ...GTLD_UNRESTRICTED,
+  ...INTERNAL_SUFFIXES.map(anyCase),
+].join('|');
 const TLD_COLLISION = FILE_EXT_COLLISION_TLDS.join('|');
 const LABEL = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?';
 
@@ -992,18 +1011,6 @@ const SPN_HOST = '(?:\\b[A-Za-z][A-Za-z0-9]*/)([A-Za-z0-9][A-Za-z0-9.-]*)(?=@[A-
 const HOST_CTX_KEY = '(?:host|hostname|computer)';
 const HOST_VALUE = '[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?';
 const HOST_CTX = `(?:\\b${HOST_CTX_KEY}\\s*[=:]\\s*)(${HOST_VALUE})`;
-
-function anyCase(word: string): string {
-  let pattern = '';
-
-  for (const char of word) {
-    const lower = char.toLowerCase();
-    const upper = char.toUpperCase();
-    pattern += lower === upper ? char : `[${lower}${upper}]`;
-  }
-
-  return pattern;
-}
 
 const QUOTED_DOMAIN_ACCOUNT = `(?:")(?!${WELL_KNOWN_DOMAIN}\\\\{1,2})(${NETBIOS_DOMAIN})(?=\\\\{1,2}${NOT_WINDOWS_FILENAME}${ACCOUNT_SEGMENT}")`;
 
@@ -1036,6 +1043,96 @@ const INVENTORY_PREFIX =
   '(?:[Ss][Rr][Vv]|[Ww][Ee][Bb]|[Dd][Bb]|[Aa][Pp][Pp]|[Hh][Oo][Ss][Tt]|[Nn][Oo][Dd][Ee]|[Pp][Oo][Dd])';
 const INVENTORY_HOST = `(?:\\b${INVENTORY_PREFIX}-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-\\d+\\b)`;
 
+const ECS_TOP_LEVEL_FIELDS = new Set([
+  'agent',
+  'as',
+  'client',
+  'cloud',
+  'code_signature',
+  'container',
+  'data_stream',
+  'destination',
+  'device',
+  'dll',
+  'dns',
+  'ecs',
+  'elf',
+  'email',
+  'endpoint',
+  'error',
+  'event',
+  'faas',
+  'file',
+  'geo',
+  'group',
+  'hash',
+  'host',
+  'http',
+  'interface',
+  'log',
+  'macho',
+  'network',
+  'observer',
+  'orchestrator',
+  'organization',
+  'os',
+  'package',
+  'pe',
+  'process',
+  'registry',
+  'related',
+  'risk',
+  'rule',
+  'server',
+  'service',
+  'source',
+  'threat',
+  'tls',
+  'trace',
+  'transaction',
+  'url',
+  'user',
+  'user_agent',
+  'vlan',
+  'vulnerability',
+  'x509',
+  'winlog',
+  'elastic',
+  'elastic_agent',
+  'kibana',
+  'labels',
+  'input',
+  'kafka',
+  'target',
+  '_tmp',
+]);
+
+const ECS_COLLISION_LEAVES = new Set([
+  'name',
+  'id',
+  'host',
+  'network',
+  'channel',
+  'email',
+  'events',
+]);
+
+function validateHostname(match: string): boolean {
+  const parts = match.split('.');
+  if (parts.length < 2) {
+    return true;
+  }
+
+  const first = parts[0].toLowerCase();
+  const last = parts[parts.length - 1].toLowerCase();
+
+  if (ECS_TOP_LEVEL_FIELDS.has(first) && ECS_COLLISION_LEAVES.has(last)) {
+    return false;
+  }
+
+  return true;
+}
+
 export const hostnamesRule: SanitizeRule = {
   id: 'hosts',
   label: 'Hostnames & domains',
@@ -1055,6 +1152,7 @@ export const hostnamesRule: SanitizeRule = {
     SYSLOG_HOST,
   ],
   aggressivePatterns: [NETBIOS_AGGRESSIVE, INVENTORY_HOST],
+  validate: validateHostname,
   jsonKeys: [
     'hostname',
     'host',

@@ -239,7 +239,7 @@ describe('sanitizeText', () => {
   });
 
   it('highlights jsonKeys values in the before preview even when regex would skip them', () => {
-    const line = JSON.stringify({ UserName: 'NT AUTHORITY\\SYSTEM' });
+    const line = JSON.stringify({ UserName: 'jdoe' });
     const { output, report } = sanitizeText(line, {
       key: KEY,
       keyEncoding: 'hex',
@@ -256,7 +256,7 @@ describe('sanitizeText', () => {
       .filter((segment) => segment.changed)
       .map((segment) => segment.text);
 
-    expect(beforeChanged).toEqual([JSON.stringify('NT AUTHORITY\\SYSTEM').slice(1, -1)]);
+    expect(beforeChanged).toEqual(['jdoe']);
     expect(afterChanged).toEqual([parsed.UserName]);
     expect(report.preview.before.map((segment) => segment.text).join('')).toBe(line);
   });

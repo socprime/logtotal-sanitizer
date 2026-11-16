@@ -4,6 +4,7 @@ import type { Readable, Writable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 
 import { createSanitizer } from '../core/sanitizer';
+import { csvOptionsForFormat } from '../csv/header';
 import { toNullSink } from '../io/sinks';
 import type {
   AbortSignalLike,
@@ -90,6 +91,13 @@ export function toFile(path: string): TextSink {
 export interface SanitizeFileOptions extends SanitizerOptions {
   /** Path of the file to read. */
   input: string;
+  /**
+   * Input mode used when `csv` is omitted. `auto` reads paths ending in `.csv` or `.tsv` as CSV
+   * (a tab delimiter for `.tsv`) and every other path as lines. `lines` forces line mode. `csv`
+   * forces CSV mode, with a tab delimiter for `.tsv` paths.
+   * @default 'auto'
+   */
+  format?: 'auto' | 'lines' | 'csv';
   /** Path to write the sanitized result to. Omit for a report-only run. */
   output?: string;
   /** Read buffer size, in bytes. */
@@ -118,8 +126,12 @@ export interface SanitizeFileOptions extends SanitizerOptions {
  * ```
  */
 export async function sanitizeFile(options: SanitizeFileOptions): Promise<SanitizeReport> {
-  const { input, output, chunkBytes, onProgress, signal, ...sanitizerOptions } = options;
-  const sanitizer = createSanitizer(sanitizerOptions);
+  const { input, output, chunkBytes, onProgress, signal, format, ...sanitizerOptions } = options;
+  const csv =
+    sanitizerOptions.csv !== undefined
+      ? sanitizerOptions.csv
+      : csvOptionsForFormat(format ?? 'auto', input);
+  const sanitizer = createSanitizer({ ...sanitizerOptions, csv });
   const sink = output === undefined ? toNullSink() : toFile(output);
 
   return sanitizer.sanitizeStream(fromFile(input, chunkBytes), sink, { onProgress, signal });

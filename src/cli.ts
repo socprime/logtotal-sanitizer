@@ -7,6 +7,7 @@ import { parseArgs } from 'node:util';
 
 import { generateKey } from './core/key';
 import { createSanitizer } from './core/sanitizer';
+import { csvOptionsForFormat } from './csv/header';
 import { toNullSink } from './io/sinks';
 import { fromFile, fromNodeStream, toFile, toNodeStream } from './node';
 import { builtinRuleIds } from './rules/registry';
@@ -33,6 +34,7 @@ Options:
       --stdout               Write sanitized text to stdout
       --report <path>        Write a JSON report to <path>
       --report-format <fmt>  json | text (default: json)
+      --format <fmt>         auto | lines | csv (default: auto)
       --rules <ids>          Comma-separated built-in rule ids (default: all)
       --exclude-rules <ids>  Comma-separated built-in rule ids to skip
       --rules-file <path>    Load extra rules from a JS/JSON module
@@ -41,6 +43,7 @@ Options:
       --redact <value>       Always redact this exact value (repeatable)
       --redact-file <path>   Newline-separated always-redact values
       --aggressive           Enable broader, noisier patterns
+      --keep-private-ips     Leave RFC 1918 IPv4 addresses unchanged
       --key <value>          HMAC key (reuse to correlate tokens across files)
       --key-file <path>      Read HMAC key from a file
       --key-encoding <enc>   hex | utf8
@@ -59,6 +62,7 @@ interface CliFlags {
   stdout: boolean;
   report?: string;
   reportFormat: 'json' | 'text';
+  format: 'auto' | 'lines' | 'csv';
   rules?: string;
   excludeRules?: string;
   rulesFile?: string;
@@ -67,6 +71,7 @@ interface CliFlags {
   redact: string[];
   redactFile?: string;
   aggressive: boolean;
+  keepPrivateIps: boolean;
   key?: string;
   keyFile?: string;
   keyEncoding?: KeyEncoding;
@@ -90,6 +95,7 @@ function parseCli(argv: string[]): CliFlags {
       stdout: { type: 'boolean', default: false },
       report: { type: 'string' },
       'report-format': { type: 'string', default: 'json' },
+      format: { type: 'string', default: 'auto' },
       rules: { type: 'string' },
       'exclude-rules': { type: 'string' },
       'rules-file': { type: 'string' },
@@ -98,6 +104,7 @@ function parseCli(argv: string[]): CliFlags {
       redact: { type: 'string', multiple: true },
       'redact-file': { type: 'string' },
       aggressive: { type: 'boolean', default: false },
+      'keep-private-ips': { type: 'boolean', default: false },
       key: { type: 'string' },
       'key-file': { type: 'string' },
       'key-encoding': { type: 'string' },
@@ -122,6 +129,7 @@ function parseCli(argv: string[]): CliFlags {
     stdout: Boolean(values.stdout),
     report: values.report,
     reportFormat: values['report-format'] === 'text' ? 'text' : 'json',
+    format: parseFormat(values.format),
     rules: values.rules,
     excludeRules: values['exclude-rules'],
     rulesFile: values['rules-file'],
@@ -130,6 +138,7 @@ function parseCli(argv: string[]): CliFlags {
     redact: values.redact ?? [],
     redactFile: values['redact-file'],
     aggressive: Boolean(values.aggressive),
+    keepPrivateIps: Boolean(values['keep-private-ips']),
     key: values.key,
     keyFile: values['key-file'],
     keyEncoding,
@@ -143,6 +152,16 @@ function parseCli(argv: string[]): CliFlags {
     version: Boolean(values.version),
     input: positionals[0],
   };
+}
+
+function parseFormat(value: string | undefined): 'auto' | 'lines' | 'csv' {
+  const format = value ?? 'auto';
+
+  if (format === 'auto' || format === 'lines' || format === 'csv') {
+    return format;
+  }
+
+  throw new Error(`Invalid value for --format: "${format}". Expected auto, lines, or csv.`);
 }
 
 async function readLines(path: string): Promise<string[]> {
@@ -372,10 +391,13 @@ export async function runCli(
     io.stderr.write(`${key}\n`);
   }
 
+  const useStdin = flags.input === '-';
   const options: SanitizerOptions = {
     rules: ruleIds,
     extraRules: extraRules.length > 0 ? extraRules : undefined,
     aggressive: flags.aggressive,
+    keepPrivateIps: flags.keepPrivateIps,
+    csv: csvOptionsForFormat(flags.format, useStdin ? undefined : flags.input),
     key,
     keyEncoding: flags.keyEncoding ?? (suppliedKey ? 'utf8' : 'hex'),
     alwaysRedact: alwaysValues.length > 0 ? { values: alwaysValues } : undefined,
@@ -389,7 +411,6 @@ export async function runCli(
   };
 
   const sanitizer = createSanitizer(options);
-  const useStdin = flags.input === '-';
   const source = useStdin ? fromNodeStream(io.stdin) : fromFile(flags.input);
   const tty = streamIsTty(io.stderr);
   const showProgress = flags.noProgress ? false : flags.progress || (tty && !flags.quiet);

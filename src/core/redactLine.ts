@@ -1,6 +1,7 @@
 import type { SanitizeSegment } from '../types';
 import { isAllowed } from './allowlist';
 import { buildReplacement, type CompiledRule, type RuleContext } from './compile';
+import { buildKeyedReplacement } from './keyedReplacement';
 import { findKeyValueMatches, type KeyValueMatch } from './redactKeyValuePairs';
 import { lineHasAnyChar } from './regexSource';
 
@@ -215,7 +216,18 @@ export function redactLine(
       keyedIndex += 1;
 
       if (!isAllowed(allow, pending.rule.id, pending.value)) {
-        const token = buildReplacement(ctx, pending.rule.id, pending.value);
+        const token = buildKeyedReplacement(ctx, pending.rule.id, pending.value);
+
+        if (token === null) {
+          for (const candidate of cursors) {
+            if (candidate.active && candidate.start < pending.end) {
+              advance(candidate, scan, pending.end);
+            }
+          }
+
+          continue;
+        }
+
         const raw = line.slice(pending.start, pending.end);
 
         if (withSegments) {

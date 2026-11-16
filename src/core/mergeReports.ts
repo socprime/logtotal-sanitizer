@@ -1,4 +1,10 @@
-import type { RuleCounts, SanitizeReplacement, SanitizeReport, SanitizeSegment } from '../types';
+import type {
+  CsvColumnPlan,
+  RuleCounts,
+  SanitizeReplacement,
+  SanitizeReport,
+  SanitizeSegment,
+} from '../types';
 import { DEFAULT_PREVIEW_BYTES } from './constants';
 
 export interface MergeReportsOptions {
@@ -74,8 +80,17 @@ export function mergeReports(
   const perRuleDistinct = limited ? new Map<string, number>() : null;
   let lineCount = 0;
   let truncated = false;
+  let csvColumns: readonly CsvColumnPlan[] | undefined;
+  let misalignedRows = 0;
 
   for (const report of reports) {
+    if (report.csv !== undefined) {
+      misalignedRows += report.csv.misalignedRows;
+
+      if (csvColumns === undefined && report.csv.columns.length > 0) {
+        csvColumns = report.csv.columns;
+      }
+    }
     lineCount += report.lineCount;
 
     if (report.replacementsTruncated === true) {
@@ -123,5 +138,13 @@ export function mergeReports(
     replacements: [...replacements.values()],
     preview: mergePreview(reports, previewBytes),
     ...(truncated ? { replacementsTruncated: true } : {}),
+    ...(csvColumns !== undefined || misalignedRows > 0
+      ? {
+          csv: {
+            columns: csvColumns ?? [],
+            misalignedRows,
+          },
+        }
+      : {}),
   };
 }

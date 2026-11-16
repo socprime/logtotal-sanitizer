@@ -1,3 +1,7 @@
+import type { CsvColumnPlan } from './csv/columns';
+
+export type { CsvColumnPlan };
+
 /**
  * Identifiers of the rules shipped with this package.
  */
@@ -162,6 +166,11 @@ export interface SanitizeReport {
    * distinct value. Counts are still complete; only the example list is truncated.
    */
   replacementsTruncated?: boolean;
+  /** Present when the run used {@link SanitizerOptions.csv}. */
+  csv?: {
+    columns: readonly CsvColumnPlan[];
+    misalignedRows: number;
+  };
 }
 
 /**
@@ -252,6 +261,27 @@ export interface ReportOptions {
 /**
  * Line splitting bounds, relevant for inputs that contain very long lines.
  */
+/**
+ * CSV parsing and column-classification options when {@link SanitizerOptions.csv} is enabled.
+ */
+export interface CsvOptions {
+  /**
+   * Field delimiter. When omitted, the first chunk is passed through {@link detectDialect}.
+   * @default auto-detected
+   */
+  delimiter?: string;
+  /**
+   * Column names used for ECS-style field classification. When set, the first record is treated
+   * as data ({@link CsvOptions.hasHeader} defaults to `false` for parallel shards).
+   */
+  header?: readonly string[];
+  /**
+   * When `true`, the first record is emitted unchanged and used as the header row.
+   * @default `true`, or `false` when {@link CsvOptions.header} is provided
+   */
+  hasHeader?: boolean;
+}
+
 export interface LineOptions {
   /**
    * A run of characters longer than this without a line terminator is processed in bounded
@@ -305,6 +335,12 @@ export interface SanitizerOptions {
   /** Values and patterns to keep even when a rule matches them. */
   neverRedact?: NeverRedactOptions;
   /**
+   * When true, RFC 1918 IPv4 addresses (10/8, 172.16/12, 192.168/16), their IPv4-mapped IPv6
+   * form, reverse-DNS PTR names, and `ip:port` values are left unchanged by the `ips` rule.
+   * @default false
+   */
+  keepPrivateIps?: boolean;
+  /**
    * How to treat lines that parse as a JSON object or array.
    *
    * - `'auto'` redacts values of fields named in a rule's `jsonKeys` and re-serializes the
@@ -318,6 +354,11 @@ export interface SanitizerOptions {
   report?: ReportOptions;
   /** Line splitting bounds. */
   lines?: LineOptions;
+  /**
+   * When `true` or a {@link CsvOptions} object, input is split into CSV records instead of lines.
+   * The header row is preserved verbatim; ECS column names drive keyed redaction per cell.
+   */
+  csv?: boolean | CsvOptions;
 }
 
 /** Result of sanitizing an in-memory string. */

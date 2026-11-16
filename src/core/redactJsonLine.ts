@@ -1,7 +1,8 @@
 import { escapeRegExp } from '../rules/alwaysRedact';
 import type { SanitizeRule, SanitizeSegment } from '../types';
 import { isAllowed } from './allowlist';
-import { buildReplacement, type RuleContext } from './compile';
+import { type RuleContext } from './compile';
+import { buildKeyedReplacement } from './keyedReplacement';
 import { jsonKeyMatcher, shouldPreserveJsonValue } from './jsonKeyMatcher';
 import {
   redactLine,
@@ -216,7 +217,12 @@ export function redactJsonLine(
       return null;
     }
 
-    const replacement = buildReplacement(ctx, rule.id, value);
+    const replacement = buildKeyedReplacement(ctx, rule.id, value);
+
+    if (replacement === null) {
+      return null;
+    }
+
     counts[rule.id] = (counts[rule.id] ?? 0) + 1;
 
     if (withSegments) {
@@ -287,9 +293,11 @@ export function redactJsonLine(
 
     if (value !== null && typeof value === 'object') {
       const out: Record<string, unknown> = {};
+      const objectPath =
+        key === undefined ? parent : parent === undefined ? key : `${parent}.${key}`;
 
       for (const [entryKey, entryValue] of Object.entries(value)) {
-        out[entryKey] = redactValue(entryValue, entryKey, key);
+        out[entryKey] = redactValue(entryValue, entryKey, objectPath);
       }
 
       return out;

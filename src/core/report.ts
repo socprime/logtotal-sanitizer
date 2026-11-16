@@ -1,4 +1,10 @@
-import type { RuleCounts, SanitizeReplacement, SanitizeReport, SanitizeSegment } from '../types';
+import type {
+  CsvColumnPlan,
+  RuleCounts,
+  SanitizeReplacement,
+  SanitizeReport,
+  SanitizeSegment,
+} from '../types';
 import { DEFAULT_PREVIEW_BYTES } from './constants';
 import { InvalidOptionError } from './errors';
 import type { RedactResult } from './redactLine';
@@ -17,6 +23,8 @@ export interface ReportCollector {
   needsSegments(): boolean;
   needsMatches(): boolean;
   record(result: RedactResult): void;
+  setCsvColumns(columns: readonly CsvColumnPlan[]): void;
+  noteMisalignedRow(): void;
   build(options?: ReportSnapshotOptions): SanitizeReport;
 }
 
@@ -43,6 +51,8 @@ export function createReportCollector(options: ReportCollectorOptions = {}): Rep
   let previewBytesUsed = 0;
   let previewClosed = previewBytes === 0;
   let truncated = false;
+  let csvColumns: readonly CsvColumnPlan[] | undefined;
+  let misalignedRows = 0;
 
   function needsSegments(): boolean {
     return !previewClosed;
@@ -50,6 +60,16 @@ export function createReportCollector(options: ReportCollectorOptions = {}): Rep
 
   function needsMatches(): boolean {
     return collectReplacements;
+  }
+
+  function setCsvColumns(columns: readonly CsvColumnPlan[]): void {
+    if (csvColumns === undefined) {
+      csvColumns = columns;
+    }
+  }
+
+  function noteMisalignedRow(): void {
+    misalignedRows += 1;
   }
 
   function record(result: RedactResult): void {
@@ -123,8 +143,16 @@ export function createReportCollector(options: ReportCollectorOptions = {}): Rep
       replacements: includeReplacements ? [...replacements.values()] : [],
       preview: { before: [...before], after: [...after] },
       ...(truncated && includeReplacements ? { replacementsTruncated: true } : {}),
+      ...(csvColumns !== undefined || misalignedRows > 0
+        ? {
+            csv: {
+              columns: csvColumns ?? [],
+              misalignedRows,
+            },
+          }
+        : {}),
     };
   }
 
-  return { needsSegments, needsMatches, record, build };
+  return { needsSegments, needsMatches, record, setCsvColumns, noteMisalignedRow, build };
 }

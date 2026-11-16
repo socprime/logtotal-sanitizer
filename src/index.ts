@@ -9,6 +9,7 @@ export {
   type SanitizerErrorCode,
 } from './core/errors';
 export { generateKey } from './core/key';
+export { readCsvHeader } from './csv/header';
 export { createSanitizer, sanitizeStream, sanitizeText } from './core/sanitizer';
 export { mergeReports, type MergeReportsOptions } from './core/mergeReports';
 export { fromBlob, fromString, fromWebStream } from './io/sources';
@@ -25,6 +26,8 @@ export type {
   AlwaysRedactOptions,
   BlobLike,
   BuiltinRuleId,
+  CsvColumnPlan,
+  CsvOptions,
   KeyEncoding,
   LineOptions,
   NeverRedactOptions,

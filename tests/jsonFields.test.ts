@@ -273,6 +273,19 @@ describe('JSON field redaction', () => {
     expect(output).toBe('  "username": "maria",');
   });
 
+  it('still redacts the mixed AUTH_EVENT regression payload', () => {
+    const { output, report } = sanitizeText(JSON.stringify(AUTH_EVENT), OPTIONS);
+
+    for (const value of SENSITIVE) {
+      expect(output).not.toContain(value);
+    }
+
+    expect(report.totalMatches).toBeGreaterThan(0);
+    const parsed = JSON.parse(output) as typeof AUTH_EVENT;
+    expect(parsed.metadata).toEqual(AUTH_EVENT.metadata);
+    expect(parsed.service).toBe('auth-api');
+  });
+
   it('redacts hosts under the reserved .test, .invalid and .localhost TLDs', () => {
     const { output } = sanitizeText(
       'Host auth-staging.example.test, api.corp.invalid and app.localhost',
