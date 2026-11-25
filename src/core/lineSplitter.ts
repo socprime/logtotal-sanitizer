@@ -11,11 +11,9 @@ function extractLines(buffer: string): { lines: string[]; rest: string } {
   const lines: string[] = [];
   let start = 0;
 
-  for (let i = 0; i < buffer.length; i += 1) {
-    if (buffer[i] === '\n') {
-      lines.push(buffer.slice(start, i + 1));
-      start = i + 1;
-    }
+  for (let end = buffer.indexOf('\n', start); end !== -1; end = buffer.indexOf('\n', end + 1)) {
+    lines.push(buffer.slice(start, end + 1));
+    start = end + 1;
   }
 
   return { lines, rest: buffer.slice(start) };

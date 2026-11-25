@@ -302,3 +302,58 @@ describe.skipIf(!existsSync(CORPUS))('span parity on a real log corpus', () => {
     }
   });
 });
+
+describe('no-match fast path parity', () => {
+  it('keeps the segment shape of the general path for empty lines', () => {
+    const ctx = createRuleContext({
+      rules: [...builtinRules],
+      aggressive: false,
+      pseudonymize: () => 'deadbeefdeadbeef',
+      allow: createAllowList(undefined),
+      contextChars: 0,
+      json: false,
+    });
+
+    expect(redactLine('', ctx, { withSegments: true }).segments).toEqual({
+      before: [],
+      after: [],
+    });
+
+    expect(redactLine('', ctx).matches).toEqual([]);
+    expect(redactLine('', ctx).output).toBe('');
+  });
+
+  it('omits segments when they were not requested', () => {
+    const ctx = createRuleContext({
+      rules: [...builtinRules],
+      aggressive: false,
+      pseudonymize: () => 'deadbeefdeadbeef',
+      allow: createAllowList(undefined),
+      contextChars: 0,
+      json: false,
+    });
+
+    expect(redactLine('', ctx, { withSegments: false }).segments).toBeUndefined();
+    expect(redactLine('nothing sensitive here at all\n', ctx).segments).toBeUndefined();
+  });
+
+  it('returns the input line itself when nothing matched', () => {
+    const ctx = createRuleContext({
+      rules: [...builtinRules],
+      aggressive: false,
+      pseudonymize: () => 'deadbeefdeadbeef',
+      allow: createAllowList(undefined),
+      contextChars: 0,
+      json: false,
+    });
+
+    const line = 'nothing sensitive here at all\n';
+    const result = redactLine(line, ctx, { withSegments: true });
+
+    expect(result.output).toBe(line);
+    expect(result.segments).toEqual({
+      before: [{ text: line, changed: false }],
+      after: [{ text: line, changed: false }],
+    });
+  });
+});

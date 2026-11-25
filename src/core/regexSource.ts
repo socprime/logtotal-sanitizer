@@ -149,7 +149,46 @@ export function deriveGateSource(source: string): string {
   return output;
 }
 
+const asciiMaskCache = new Map<string, Uint8Array>();
+
+function asciiMaskFor(chars: string): Uint8Array | null {
+  const cached = asciiMaskCache.get(chars);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const mask = new Uint8Array(128);
+
+  for (let i = 0; i < chars.length; i += 1) {
+    const code = chars.charCodeAt(i);
+
+    if (code >= 128) {
+      return null;
+    }
+
+    mask[code] = 1;
+  }
+
+  asciiMaskCache.set(chars, mask);
+  return mask;
+}
+
 export function lineHasAnyChar(line: string, chars: string): boolean {
+  const mask = asciiMaskFor(chars);
+
+  if (mask !== null) {
+    for (let index = 0; index < line.length; index += 1) {
+      const code = line.charCodeAt(index);
+
+      if (code < 128 && mask[code] === 1) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   for (let index = 0; index < line.length; index += 1) {
     if (chars.includes(line[index]!)) {
       return true;

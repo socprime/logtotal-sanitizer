@@ -20,11 +20,54 @@ function rotr(value: number, bits: number): number {
   return ((value >>> bits) | (value << (32 - bits))) >>> 0;
 }
 
-function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const out = new Uint8Array(a.length + b.length);
-  out.set(a, 0);
-  out.set(b, a.length);
-  return out;
+function compressBlock(state: Uint32Array, view: DataView, offset: number, w: Uint32Array): void {
+  for (let i = 0; i < 16; i += 1) {
+    w[i] = view.getUint32(offset + i * 4, false);
+  }
+
+  for (let i = 16; i < 64; i += 1) {
+    const x = w[i - 15]!;
+    const y = w[i - 2]!;
+    const s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3);
+    const s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10);
+    w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
+  }
+
+  let a = state[0]!;
+  let b = state[1]!;
+  let c = state[2]!;
+  let d = state[3]!;
+  let e = state[4]!;
+  let f = state[5]!;
+  let g = state[6]!;
+  let h = state[7]!;
+
+  for (let i = 0; i < 64; i += 1) {
+    const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+    const ch = (e & f) ^ (~e & g);
+    const temp1 = (h + s1 + ch + K[i]! + w[i]!) >>> 0;
+    const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+    const maj = (a & b) ^ (a & c) ^ (b & c);
+    const temp2 = (s0 + maj) >>> 0;
+
+    h = g;
+    g = f;
+    f = e;
+    e = (d + temp1) >>> 0;
+    d = c;
+    c = b;
+    b = a;
+    a = (temp1 + temp2) >>> 0;
+  }
+
+  state[0] = (state[0]! + a) >>> 0;
+  state[1] = (state[1]! + b) >>> 0;
+  state[2] = (state[2]! + c) >>> 0;
+  state[3] = (state[3]! + d) >>> 0;
+  state[4] = (state[4]! + e) >>> 0;
+  state[5] = (state[5]! + f) >>> 0;
+  state[6] = (state[6]! + g) >>> 0;
+  state[7] = (state[7]! + h) >>> 0;
 }
 
 function padMessage(message: Uint8Array): Uint8Array {
@@ -49,53 +92,20 @@ export function sha256(message: Uint8Array): Uint8Array {
   const w = new Uint32Array(64);
 
   for (let offset = 0; offset < padded.length; offset += BLOCK_BYTES) {
-    for (let i = 0; i < 16; i += 1) {
-      w[i] = view.getUint32(offset + i * 4, false);
-    }
-
-    for (let i = 16; i < 64; i += 1) {
-      const s0 = rotr(w[i - 15]!, 7) ^ rotr(w[i - 15]!, 18) ^ (w[i - 15]! >>> 3);
-      const s1 = rotr(w[i - 2]!, 17) ^ rotr(w[i - 2]!, 19) ^ (w[i - 2]! >>> 10);
-      w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
-    }
-
-    let a = state[0]!;
-    let b = state[1]!;
-    let c = state[2]!;
-    let d = state[3]!;
-    let e = state[4]!;
-    let f = state[5]!;
-    let g = state[6]!;
-    let h = state[7]!;
-
-    for (let i = 0; i < 64; i += 1) {
-      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-      const ch = (e & f) ^ (~e & g);
-      const temp1 = (h + s1 + ch + K[i]! + w[i]!) >>> 0;
-      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-      const maj = (a & b) ^ (a & c) ^ (b & c);
-      const temp2 = (s0 + maj) >>> 0;
-
-      h = g;
-      g = f;
-      f = e;
-      e = (d + temp1) >>> 0;
-      d = c;
-      c = b;
-      b = a;
-      a = (temp1 + temp2) >>> 0;
-    }
-
-    state[0] = (state[0]! + a) >>> 0;
-    state[1] = (state[1]! + b) >>> 0;
-    state[2] = (state[2]! + c) >>> 0;
-    state[3] = (state[3]! + d) >>> 0;
-    state[4] = (state[4]! + e) >>> 0;
-    state[5] = (state[5]! + f) >>> 0;
-    state[6] = (state[6]! + g) >>> 0;
-    state[7] = (state[7]! + h) >>> 0;
+    compressBlock(state, view, offset, w);
   }
 
+  const digest = new Uint8Array(DIGEST_BYTES);
+  const digestView = new DataView(digest.buffer);
+
+  for (let i = 0; i < 8; i += 1) {
+    digestView.setUint32(i * 4, state[i]!, false);
+  }
+
+  return digest;
+}
+
+function stateToDigest(state: Uint32Array): Uint8Array {
   const digest = new Uint8Array(DIGEST_BYTES);
   const digestView = new DataView(digest.buffer);
 
@@ -130,8 +140,75 @@ export function createHmacSha256(key: Uint8Array): KeyedHmacSha256 {
     opad[i] = block[i]! ^ 0x5c;
   }
 
-  return (message: Uint8Array): Uint8Array =>
-    sha256(concatBytes(opad, sha256(concatBytes(ipad, message))));
+  const w = new Uint32Array(64);
+  const midInner = Uint32Array.from(INITIAL_STATE);
+  const midOuter = Uint32Array.from(INITIAL_STATE);
+
+  const padView = new DataView(new ArrayBuffer(BLOCK_BYTES));
+
+  for (let i = 0; i < BLOCK_BYTES; i += 1) {
+    padView.setUint8(i, ipad[i]!);
+  }
+
+  compressBlock(midInner, padView, 0, w);
+
+  for (let i = 0; i < BLOCK_BYTES; i += 1) {
+    padView.setUint8(i, opad[i]!);
+  }
+
+  compressBlock(midOuter, padView, 0, w);
+
+  const scratch = new Uint8Array(BLOCK_BYTES * 2);
+  const scratchView = new DataView(scratch.buffer);
+  const outerBlock = new Uint8Array(BLOCK_BYTES);
+  const outerView = new DataView(outerBlock.buffer);
+  const state = new Uint32Array(8);
+
+  return (message: Uint8Array): Uint8Array => {
+    const len = message.length;
+    const scratchLength = Math.ceil((len + 9) / BLOCK_BYTES) * BLOCK_BYTES;
+
+    let bytes = scratch;
+    let view = scratchView;
+
+    if (scratchLength > bytes.length) {
+      bytes = new Uint8Array(scratchLength);
+      view = new DataView(bytes.buffer);
+    }
+
+    bytes.set(message, 0);
+    bytes[len] = 0x80;
+    bytes.fill(0, len + 1, scratchLength - 8);
+
+    const bitLength = (BLOCK_BYTES + len) * 8;
+    view.setUint32(scratchLength - 8, Math.floor(bitLength / 2 ** 32), false);
+    view.setUint32(scratchLength - 4, bitLength >>> 0, false);
+
+    state.set(midInner);
+
+    for (let offset = 0; offset < scratchLength; offset += BLOCK_BYTES) {
+      compressBlock(state, view, offset, w);
+    }
+
+    const innerDigest = stateToDigest(state);
+    outerBlock.set(innerDigest, 0);
+    innerDigest.fill(0);
+    outerBlock[DIGEST_BYTES] = 0x80;
+    outerBlock.fill(0, DIGEST_BYTES + 1, BLOCK_BYTES - 8);
+    outerView.setUint32(BLOCK_BYTES - 8, 0, false);
+    outerView.setUint32(BLOCK_BYTES - 4, ((BLOCK_BYTES + DIGEST_BYTES) * 8) >>> 0, false);
+
+    state.set(midOuter);
+    compressBlock(state, outerView, 0, w);
+
+    const digest = stateToDigest(state);
+
+    bytes.fill(0, 0, scratchLength);
+    outerBlock.fill(0, 0, BLOCK_BYTES);
+    w.fill(0);
+
+    return digest;
+  };
 }
 
 export function hexToBytes(hex: string): Uint8Array {
@@ -144,6 +221,15 @@ export function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
+const HEX_DIGITS = '0123456789abcdef';
+
 export function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  let hex = '';
+
+  for (let i = 0; i < bytes.length; i += 1) {
+    const byte = bytes[i]!;
+    hex += HEX_DIGITS[byte >>> 4]! + HEX_DIGITS[byte & 15]!;
+  }
+
+  return hex;
 }
